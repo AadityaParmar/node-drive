@@ -11,6 +11,7 @@ export interface UploadCheckResponse {
   uploadedSize: number;
   isComplete: boolean;
   uploadId?: string | undefined;
+  shouldRestart?: boolean | undefined;
 }
 
 export interface UploadRequest {
@@ -30,7 +31,9 @@ export interface UploadResponse {
   uploadId: string;
   bytesUploaded: number;
   isComplete: boolean;
-  message?: string | undefined; // optional error message
+  message?: string | undefined;
+  actualSize?: number | undefined;
+  expectedStartByte?: number | undefined;
 }
 
 export interface DeleteRequest {

@@ -95,13 +95,31 @@ app.post('/api/upload/check', async (req, res) => {
       });
     }
 
-    if (metadata.isComplete && metadata.checksum === checksum) {
+    if (metadata.isComplete && metadata.checksum === checksum && metadata.fileSize === fileSize) {
       AppLog.info('UploadCheckEndpoint', `File already exists and complete: ${fileName} for user ${username}`);
       return res.status(409).json({
         exists: true,
         uploadedSize: metadata.fileSize,
         isComplete: true,
         uploadId: metadata.uploadId
+      });
+    }
+
+    // Handle file size mismatch - restart upload
+    if (metadata.fileSize !== fileSize || metadata.checksum !== checksum) {
+      AppLog.info('UploadCheckEndpoint', `File metadata mismatch detected, will restart upload: ${fileName} for user ${username}`);
+      const uploadPath = getUploadPath(metadata.uploadId);
+      try {
+        await fs.unlink(uploadPath);
+      } catch {
+        // File might not exist, continue
+      }
+      
+      return res.json({
+        exists: false,
+        uploadedSize: 0,
+        isComplete: false,
+        shouldRestart: true
       });
     }
 
@@ -175,12 +193,16 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       try {
         const stats = await fs.stat(uploadPath);
         if (startByteNum !== stats.size) {
+          AppLog.error('UploadEndpoint', `Range mismatch: expected ${startByteNum}, actual ${stats.size} for ${fileName}`);
           return res.status(416).json({
             success: false,
-            message: 'Invalid range for resumable upload'
+            message: 'Invalid range for resumable upload',
+            actualSize: stats.size,
+            expectedStartByte: startByteNum
           });
         }
       } catch {
+        AppLog.error('UploadEndpoint', `Upload file not found for resume: ${uploadPath} for ${fileName}`);
         return res.status(416).json({
           success: false,
           message: 'Upload file not found for resume'

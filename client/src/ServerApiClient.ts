@@ -283,13 +283,28 @@ export class ServerApiClient {
     AppLog.info('ServerApiClient', `[RESUMABLE] Starting upload for file: ${metadata.fileName}, size: ${fileSize} bytes`);
 
     // Check if file already exists or is partially uploaded
-    const checkResponse = await this.checkUpload({
-      username: metadata.username,
-      deviceId: metadata.deviceId,
-      fileName: metadata.fileName,
-      fileSize,
-      checksum: metadata.checksum
-    });
+    let checkResponse: UploadCheckResponse;
+    try {
+      checkResponse = await this.checkUpload({
+        username: metadata.username,
+        deviceId: metadata.deviceId,
+        fileName: metadata.fileName,
+        fileSize,
+        checksum: metadata.checksum
+      });
+    } catch (error: any) {
+      // If server indicates file doesn't exist, start fresh upload
+      if (error.statusCode === 404) {
+        AppLog.info('ServerApiClient', `[RESUMABLE] File not found on server, starting fresh upload: ${metadata.fileName}`);
+        checkResponse = {
+          exists: false,
+          uploadedSize: 0,
+          isComplete: false
+        };
+      } else {
+        throw error;
+      }
+    }
 
     // If file is already complete, return success
     if (checkResponse.isComplete) {
@@ -299,6 +314,16 @@ export class ServerApiClient {
         uploadId: checkResponse.uploadId || '',
         bytesUploaded: fileSize,
         isComplete: true
+      };
+    }
+
+    // If server indicates we should restart due to metadata mismatch
+    if (checkResponse.shouldRestart) {
+      AppLog.info('ServerApiClient', `[RESUMABLE] Server requested restart due to metadata mismatch: ${metadata.fileName}`);
+      checkResponse = {
+        exists: false,
+        uploadedSize: 0,
+        isComplete: false
       };
     }
 
@@ -318,18 +343,40 @@ export class ServerApiClient {
       const startByte = checkResponse.uploadedSize;
       AppLog.info('ServerApiClient', `[RESUMABLE] Resuming upload from byte ${startByte} for file: ${metadata.fileName}`);
       
-      if (file instanceof File) {
-        uploadRequest.file = file.slice(startByte);
+      // Validate that we can resume from this point
+      if (startByte >= fileSize) {
+        AppLog.error('ServerApiClient', `[RESUMABLE] Invalid resume point ${startByte} >= file size ${fileSize} for: ${metadata.fileName}`);
+        // Start fresh upload
+        uploadRequest.startByte = undefined;
+        uploadRequest.uploadId = undefined;
       } else {
-        uploadRequest.file = file.subarray(startByte);
+        if (file instanceof File) {
+          uploadRequest.file = file.slice(startByte);
+        } else {
+          uploadRequest.file = file.subarray(startByte);
+        }
+        
+        uploadRequest.startByte = startByte.toString();
+        uploadRequest.uploadId = checkResponse.uploadId;
       }
-      
-      uploadRequest.startByte = startByte.toString();
-      uploadRequest.uploadId = checkResponse.uploadId;
     }
 
-    // Perform upload
-    const uploadResponse = await this.uploadFile(uploadRequest);
+    // Perform upload with retry logic for resumable uploads
+    let uploadResponse: UploadResponse;
+    try {
+      uploadResponse = await this.uploadFile(uploadRequest);
+    } catch (error: any) {
+      // Handle range errors by restarting upload
+      if (error.statusCode === 416) {
+        AppLog.info('ServerApiClient', `[RESUMABLE] Range error, restarting upload for: ${metadata.fileName}`);
+        uploadRequest.startByte = undefined;
+        uploadRequest.uploadId = undefined;
+        uploadRequest.file = file;
+        uploadResponse = await this.uploadFile(uploadRequest);
+      } else {
+        throw error;
+      }
+    }
 
     // Call progress callback if provided
     if (onProgress) {
