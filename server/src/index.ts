@@ -27,6 +27,7 @@ interface FileMetadata {
   isComplete: boolean;
   lastModified: string;
   uploadTimestamp: string;
+  finalFileName?: string;
 }
 
 async function ensureDirectories() {
@@ -44,6 +45,13 @@ function getMetadataPath(fileKey: string): string {
 
 function getUploadPath(uploadId: string): string {
   return path.join(UPLOAD_DIR, uploadId);
+}
+
+function generateTimestampedFileName(originalFileName: string): string {
+  const timestamp = Date.now();
+  const ext = path.extname(originalFileName);
+  const nameWithoutExt = path.basename(originalFileName, ext);
+  return `${nameWithoutExt}(${timestamp})${ext}`;
 }
 
 async function loadMetadata(fileKey: string): Promise<FileMetadata | null> {
@@ -226,8 +234,14 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     if (metadata.uploadedSize >= metadata.fileSize) {
       const actualChecksum = await calculateChecksum(uploadPath);
       if (actualChecksum === metadata.checksum) {
+        // Generate timestamped filename and move the file
+        const timestampedFileName = generateTimestampedFileName(fileName);
+        const finalPath = path.join(UPLOAD_DIR, timestampedFileName);
+        
+        await fs.rename(uploadPath, finalPath);
+        metadata.finalFileName = timestampedFileName;
         metadata.isComplete = true;
-        AppLog.info('UploadEndpoint', `File upload completed successfully: ${fileName} for user ${username}`);
+        AppLog.info('UploadEndpoint', `File upload completed successfully: ${fileName} -> ${timestampedFileName} for user ${username}`);
       } else {
         await fs.unlink(uploadPath);
         AppLog.error('UploadEndpoint', `Checksum verification failed for file: ${fileName} for user ${username}`);
@@ -282,8 +296,14 @@ app.post('/api/delete', async (req, res) => {
     const uploadPath = getUploadPath(metadata.uploadId);
     const metadataPath = getMetadataPath(fileKey);
 
+    // Delete the actual file (either temp upload or final timestamped file)
     try {
-      await fs.unlink(uploadPath);
+      if (metadata.isComplete && metadata.finalFileName) {
+        const finalPath = path.join(UPLOAD_DIR, metadata.finalFileName);
+        await fs.unlink(finalPath);
+      } else {
+        await fs.unlink(uploadPath);
+      }
     } catch {
       // File might not exist, continue with metadata cleanup
     }

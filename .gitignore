@@ -111,3 +111,5 @@ Thumbs.db
 build/
 dist/
 out/
+/server/uploads/*
+/server/metadata/*

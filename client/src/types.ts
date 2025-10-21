@@ -64,3 +64,37 @@ export class ServerApiError extends Error {
     this.name = 'ServerApiError';
   }
 }
+
+export interface FileInfo {
+  fileName: string;
+  fileSize: string; // number as string
+  file: File | Buffer | Blob;
+  lastModified: string; // ISO date
+}
+
+export function getFileInfo(file: File | Buffer | Blob, fileName?: string): FileInfo {
+  let name: string;
+  let size: number;
+  let lastModified: string;
+
+  if (file instanceof File) {
+    name = file.name;
+    size = file.size;
+    lastModified = new Date(file.lastModified).toISOString();
+  } else if (file instanceof Blob) {
+    name = fileName || 'blob-file';
+    size = file.size;
+    lastModified = new Date().toISOString();
+  } else {
+    name = fileName || 'buffer-file';
+    size = file.length;
+    lastModified = new Date().toISOString();
+  }
+
+  return {
+    fileName: name,
+    fileSize: size.toString(),
+    file: file,
+    lastModified: lastModified
+  };
+}
