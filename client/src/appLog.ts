@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 export enum LogType {
   DEBUG = 'D',
@@ -19,6 +20,7 @@ export class AppLog {
   };
 
   private constructor() {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
     this.logDir = path.join(__dirname, 'logs');
     this.ensureLogDirectory();
   }
