@@ -9,12 +9,15 @@ import type {
   ServerApiConfig
 } from './types.js';
 import { ServerApiError } from './types.js';
+import { AppLog } from './appLog.js';
 
 export class ServerApiClient {
   private readonly client: AxiosInstance;
   private readonly config: Required<ServerApiConfig>;
+  private requestCounter: number = 0;
 
   constructor(config: ServerApiConfig) {
+    AppLog.info('ServerApiClient', `Initializing client with baseUrl: ${config.baseUrl}`);
     this.config = {
       timeout: 30000,
       retryAttempts: 3,
@@ -53,6 +56,7 @@ export class ServerApiClient {
           originalRequest._retry = true;
           originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
           
+          AppLog.debug('ServerApiClient', `[RETRY] Attempt ${originalRequest._retryCount} for ${originalRequest.method?.toUpperCase()} ${originalRequest.url}`);
           await this.delay((this.config.retryDelay || 1000) * (originalRequest._retryCount || 1));
           if (originalRequest) {
             return this.client(originalRequest);
@@ -66,6 +70,26 @@ export class ServerApiClient {
 
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private generateRequestId(): string {
+    return `req_${++this.requestCounter}_${Date.now()}`;
+  }
+
+  private getFullUrl(path: string): string {
+    return `${this.config.baseUrl}${path}`;
+  }
+
+  private logRequest(reqId: string, method: string, url: string, data?: any): void {
+    AppLog.info('ServerApiClient', `>> ${reqId} ${method.toUpperCase()} ${url}${data ? ` | Data: ${JSON.stringify(data)}` : ''}`);
+  }
+
+  private logResponse(reqId: string, status: number, url: string, data?: any): void {
+    AppLog.info('ServerApiClient', `<< ${reqId} ${status} ${url}${data ? ` | Response: ${JSON.stringify(data)}` : ''}`);
+  }
+
+  private logException(reqId: string, method: string, url: string, error: any): void {
+    AppLog.error('ServerApiClient', `!! ${reqId} ${method.toUpperCase()} ${url} | Exception: ${error.message || error}`);
   }
 
   private handleError(error: AxiosError): ServerApiError {
@@ -88,10 +112,18 @@ export class ServerApiClient {
    * GET /api/ping
    */
   async ping(): Promise<boolean> {
+    const reqId = this.generateRequestId();
+    const path = '/api/ping';
+    const fullUrl = this.getFullUrl(path);
+    
     try {
-      const response = await this.client.get('/api/ping');
-      return response.status === 200;
+      this.logRequest(reqId, 'GET', fullUrl);
+      const response = await this.client.get(path);
+      const isHealthy = response.status === 200;
+      this.logResponse(reqId, response.status, fullUrl, { healthy: isHealthy });
+      return isHealthy;
     } catch (error) {
+      this.logException(reqId, 'GET', fullUrl, error);
       throw this.handleError(error as AxiosError);
     }
   }
@@ -101,17 +133,22 @@ export class ServerApiClient {
    * POST /api/upload/check
    */
   async checkUpload(request: UploadCheckRequest): Promise<UploadCheckResponse> {
+    const reqId = this.generateRequestId();
+    const path = '/api/upload/check';
+    const fullUrl = this.getFullUrl(path);
+    
     try {
-      const response: AxiosResponse<UploadCheckResponse> = await this.client.post(
-        '/api/upload/check',
-        request
-      );
+      this.logRequest(reqId, 'POST', fullUrl, request);
+      const response: AxiosResponse<UploadCheckResponse> = await this.client.post(path, request);
+      this.logResponse(reqId, response.status, fullUrl, response.data);
       return response.data;
     } catch (error) {
+      this.logException(reqId, 'POST', fullUrl, error);
       const apiError = this.handleError(error as AxiosError);
       
       // Handle 409 Conflict (file already exists and is complete)
       if (apiError.statusCode === 409 && apiError.response) {
+        this.logResponse(reqId, 409, fullUrl, apiError.response);
         return apiError.response as UploadCheckResponse;
       }
       
@@ -124,7 +161,24 @@ export class ServerApiClient {
    * POST /api/upload
    */
   async uploadFile(request: UploadRequest): Promise<UploadResponse> {
+    const reqId = this.generateRequestId();
+    const path = '/api/upload';
+    const fullUrl = this.getFullUrl(path);
+    
     try {
+      // Log request with metadata (not the file content for brevity)
+      const logData = {
+        username: request.username,
+        deviceId: request.deviceId,
+        fileName: request.fileName,
+        fileSize: request.fileSize,
+        checksum: request.checksum,
+        startByte: request.startByte,
+        uploadId: request.uploadId,
+        fileType: request.file instanceof File ? 'File' : request.file instanceof Blob ? 'Blob' : 'Buffer'
+      };
+      this.logRequest(reqId, 'POST', fullUrl, logData);
+      
       const formData = new FormData();
       
       // Add form fields
@@ -176,13 +230,15 @@ export class ServerApiClient {
       }
 
       const response: AxiosResponse<UploadResponse> = await this.client.post(
-        '/api/upload',
+        path,
         formData,
         { headers }
       );
 
+      this.logResponse(reqId, response.status, fullUrl, response.data);
       return response.data;
     } catch (error) {
+      this.logException(reqId, 'POST', fullUrl, error);
       throw this.handleError(error as AxiosError);
     }
   }
@@ -192,13 +248,17 @@ export class ServerApiClient {
    * POST /api/delete
    */
   async deleteFile(request: DeleteRequest): Promise<DeleteResponse> {
+    const reqId = this.generateRequestId();
+    const path = '/api/delete';
+    const fullUrl = this.getFullUrl(path);
+    
     try {
-      const response: AxiosResponse<DeleteResponse> = await this.client.post(
-        '/api/delete',
-        request
-      );
+      this.logRequest(reqId, 'POST', fullUrl, request);
+      const response: AxiosResponse<DeleteResponse> = await this.client.post(path, request);
+      this.logResponse(reqId, response.status, fullUrl, response.data);
       return response.data;
     } catch (error) {
+      this.logException(reqId, 'POST', fullUrl, error);
       throw this.handleError(error as AxiosError);
     }
   }
@@ -220,6 +280,7 @@ export class ServerApiClient {
   ): Promise<UploadResponse> {
     const fileSize = file instanceof File ? file.size : file.length;
     const lastModified = metadata.lastModified || new Date().toISOString();
+    AppLog.info('ServerApiClient', `[RESUMABLE] Starting upload for file: ${metadata.fileName}, size: ${fileSize} bytes`);
 
     // Check if file already exists or is partially uploaded
     const checkResponse = await this.checkUpload({
@@ -232,6 +293,7 @@ export class ServerApiClient {
 
     // If file is already complete, return success
     if (checkResponse.isComplete) {
+      AppLog.info('ServerApiClient', `[RESUMABLE] File already complete, skipping upload: ${metadata.fileName}`);
       return {
         success: true,
         uploadId: checkResponse.uploadId || '',
@@ -254,6 +316,7 @@ export class ServerApiClient {
     // Handle resumable upload
     if (checkResponse.exists && checkResponse.uploadedSize > 0) {
       const startByte = checkResponse.uploadedSize;
+      AppLog.info('ServerApiClient', `[RESUMABLE] Resuming upload from byte ${startByte} for file: ${metadata.fileName}`);
       
       if (file instanceof File) {
         uploadRequest.file = file.slice(startByte);
@@ -273,6 +336,7 @@ export class ServerApiClient {
       onProgress(uploadResponse.bytesUploaded, fileSize);
     }
 
+    AppLog.info('ServerApiClient', `[RESUMABLE] Upload ${uploadResponse.isComplete ? 'completed' : 'in progress'} for file: ${metadata.fileName}`);
     return uploadResponse;
   }
 
@@ -280,6 +344,7 @@ export class ServerApiClient {
    * Update base URL
    */
   setBaseUrl(baseUrl: string): void {
+    AppLog.info('ServerApiClient', `Updating base URL to: ${baseUrl}`);
     this.config.baseUrl = baseUrl;
     this.client.defaults.baseURL = baseUrl;
   }

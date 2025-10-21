@@ -1,4 +1,5 @@
 import { ServerApiClient, ServerApiError } from './index.js';
+import { AppLog } from './appLog.js';
 
 // Example usage of the ServerApiClient
 async function main() {
@@ -12,9 +13,9 @@ async function main() {
 
   try {
     // 1. Health check
-    console.log('Testing server connection...');
+    AppLog.info('Example', 'Testing server connection...');
     const isHealthy = await apiClient.ping();
-    console.log('Server is healthy:', isHealthy);
+    AppLog.info('Example', `Server is healthy: ${isHealthy}`);
 
     // 2. Example file upload workflow
     const username = 'john_doe';
@@ -24,7 +25,7 @@ async function main() {
     const checksum = 'abc123def456'; // In real use, calculate actual checksum
 
     // Check if file already exists
-    console.log('\nChecking if file exists...');
+    AppLog.info('Example', 'Checking if file exists...');
     const checkResponse = await apiClient.checkUpload({
       username,
       deviceId,
@@ -33,13 +34,13 @@ async function main() {
       checksum
     });
 
-    console.log('Check response:', checkResponse);
+    AppLog.debug('Example', `Check response: ${JSON.stringify(checkResponse)}`);
 
     if (checkResponse.isComplete) {
-      console.log('File already exists and is complete!');
+      AppLog.info('Example', 'File already exists and is complete!');
     } else {
       // Upload the file
-      console.log('\nUploading file...');
+      AppLog.info('Example', 'Uploading file...');
       const uploadResponse = await apiClient.uploadFile({
         username,
         deviceId,
@@ -53,11 +54,11 @@ async function main() {
         uploadId: checkResponse.uploadId
       });
 
-      console.log('Upload response:', uploadResponse);
+      AppLog.info('Example', `Upload response: ${JSON.stringify(uploadResponse)}`);
     }
 
     // 3. Example resumable upload (easier method)
-    console.log('\nTesting resumable upload helper...');
+    AppLog.info('Example', 'Testing resumable upload helper...');
     const resumableResponse = await apiClient.uploadFileResumable(
       fileContent,
       {
@@ -67,31 +68,27 @@ async function main() {
         checksum: 'xyz789abc123'
       },
       (bytesUploaded, totalBytes) => {
-        console.log(`Progress: ${bytesUploaded}/${totalBytes} bytes (${Math.round(bytesUploaded / totalBytes * 100)}%)`);
+        AppLog.debug('Example', `Progress: ${bytesUploaded}/${totalBytes} bytes (${Math.round(bytesUploaded / totalBytes * 100)}%)`);
       }
     );
 
-    console.log('Resumable upload response:', resumableResponse);
+    AppLog.info('Example', `Resumable upload response: ${JSON.stringify(resumableResponse)}`);
 
     // 4. Delete a file
-    console.log('\nDeleting file...');
+    AppLog.info('Example', 'Deleting file...');
     const deleteResponse = await apiClient.deleteFile({
       username,
       deviceId,
       fileName: 'resumable_test.txt'
     });
 
-    console.log('Delete response:', deleteResponse);
+    AppLog.info('Example', `Delete response: ${JSON.stringify(deleteResponse)}`);
 
   } catch (error) {
     if (error instanceof ServerApiError) {
-      console.error('API Error:', {
-        message: error.message,
-        statusCode: error.statusCode,
-        response: error.response
-      });
+      AppLog.error('Example', `API Error: ${error.message} (status: ${error.statusCode})`);
     } else {
-      console.error('Unexpected error:', error);
+      AppLog.error('Example', `Unexpected error: ${error}`);
     }
   }
 }
@@ -124,7 +121,7 @@ export function createBrowserExample() {
         },
         (bytesUploaded, totalBytes) => {
           const progress = Math.round(bytesUploaded / totalBytes * 100);
-          console.log(`Upload progress: ${progress}%`);
+          AppLog.debug('BrowserExample', `Upload progress: ${progress}%`);
           // Update UI progress bar here
         }
       );
@@ -172,21 +169,21 @@ export function handleApiErrors() {
           if (error instanceof ServerApiError) {
             switch (error.statusCode) {
               case 409: // File already exists
-                console.log('File already exists, skipping upload');
+                AppLog.info('RobustUpload', 'File already exists, skipping upload');
                 return { success: true, isComplete: true };
                 
               case 416: // Invalid range for resume
-                console.log('Invalid resume range, starting fresh upload');
+                AppLog.error('RobustUpload', 'Invalid resume range, starting fresh upload');
                 // Could implement logic to start from beginning
                 break;
                 
               case 400: // Bad request
-                console.error('Invalid request data:', error.message);
+                AppLog.error('RobustUpload', `Invalid request data: ${error.message}`);
                 throw error; // Don't retry bad requests
                 
               case 500: // Server error
                 if (retryCount < maxRetries) {
-                  console.log(`Server error, retrying... (${retryCount}/${maxRetries})`);
+                  AppLog.debug('RobustUpload', `Server error, retrying... (${retryCount}/${maxRetries})`);
                   await new Promise(resolve => setTimeout(resolve, 2000));
                   continue;
                 }

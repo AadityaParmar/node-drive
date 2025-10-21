@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
+import { AppLog } from './appLog.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -69,6 +70,7 @@ async function calculateChecksum(filePath: string): Promise<string> {
 
 // Health check endpoint
 app.get('/api/ping', (req, res) => {
+  AppLog.debug('HealthCheck', 'Ping request received');
   res.sendStatus(200);
 });
 
@@ -76,6 +78,7 @@ app.get('/api/ping', (req, res) => {
 app.post('/api/upload/check', async (req, res) => {
   try {
     const { username, deviceId, fileName, fileSize, checksum } = req.body;
+    AppLog.debug('UploadCheckEndpoint', `Upload check request for ${fileName} from user ${username}`);
     
     if (!username || !deviceId || !fileName || !fileSize || !checksum) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -93,6 +96,7 @@ app.post('/api/upload/check', async (req, res) => {
     }
 
     if (metadata.isComplete && metadata.checksum === checksum) {
+      AppLog.info('UploadCheckEndpoint', `File already exists and complete: ${fileName} for user ${username}`);
       return res.status(409).json({
         exists: true,
         uploadedSize: metadata.fileSize,
@@ -118,7 +122,7 @@ app.post('/api/upload/check', async (req, res) => {
       });
     }
   } catch (error) {
-    console.error('Upload check error:', error);
+    AppLog.error('UploadCheckEndpoint', `Upload check error: ${error}`);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -142,6 +146,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
     const fileSizeNum = parseInt(fileSize);
     const startByteNum = parseInt(startByte || '0');
+    AppLog.info('UploadEndpoint', `Upload request for ${fileName} from user ${username}, startByte: ${startByteNum}`);
     
     const fileKey = getFileKey(username, deviceId, fileName);
     let metadata = await loadMetadata(fileKey);
@@ -200,8 +205,10 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       const actualChecksum = await calculateChecksum(uploadPath);
       if (actualChecksum === metadata.checksum) {
         metadata.isComplete = true;
+        AppLog.info('UploadEndpoint', `File upload completed successfully: ${fileName} for user ${username}`);
       } else {
         await fs.unlink(uploadPath);
+        AppLog.error('UploadEndpoint', `Checksum verification failed for file: ${fileName} for user ${username}`);
         return res.status(400).json({
           success: false,
           message: 'Checksum verification failed'
@@ -219,7 +226,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Upload error:', error);
+    AppLog.error('UploadEndpoint', `Upload error: ${error}`);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 
@@ -231,6 +238,7 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 app.post('/api/delete', async (req, res) => {
   try {
     const { username, deviceId, fileName } = req.body;
+    AppLog.info('DeleteEndpoint', `Delete request for ${fileName} from user ${username}`);
     
     if (!username || !deviceId || !fileName) {
       return res.status(400).json({ 
@@ -270,7 +278,7 @@ app.post('/api/delete', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete error:', error);
+    AppLog.error('DeleteEndpoint', `Delete error: ${error}`);
     res.status(500).json({ 
       success: false, 
       message: 'Internal server error' 
@@ -280,12 +288,14 @@ app.post('/api/delete', async (req, res) => {
 
 async function startServer() {
   try {
+    AppLog.info('Server', 'Starting server...');
     await ensureDirectories();
+    AppLog.debug('Server', 'Directories ensured');
     app.listen(PORT, () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+      AppLog.info('Server', `Server running on http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    AppLog.error('Server', `Failed to start server: ${error}`);
     process.exit(1);
   }
 }
