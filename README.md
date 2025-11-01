@@ -1,7 +1,7 @@
 # Node Drive
 
 A cross-platform file monitoring and synchronization system with extensive Windows support, including Windows XP.
-
+https://notepad.pw/txfsitPfcyvdfwoiGMvU
 ## Overview
 
 Node Drive is a client-server system that monitors directories for file changes and automatically synchronizes them to a central server. It consists of a Node.js/TypeScript server and a Java-based client with full backward compatibility for legacy Windows systems.
