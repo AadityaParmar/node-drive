@@ -1,6 +1,10 @@
 # Use x86_64 platform for launch4j compatibility (works on both Intel and Apple Silicon via emulation)
 FROM --platform=linux/amd64 openjdk:8-jdk
 
+# Build argument to bust cache and ensure latest code is used
+ARG BUILD_TIMESTAMP
+ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y \
@@ -31,8 +35,12 @@ RUN dos2unix ./gradlew
 # Copy build configuration files
 COPY build.gradle .
 COPY settings.gradle .
+COPY gradle.properties .
 
-# Copy source code
+# Use build timestamp to ensure cache is busted for source code
+RUN echo "Building at timestamp: ${BUILD_TIMESTAMP}"
+
+# Copy source code (this layer will always rebuild due to timestamp above)
 COPY src ./src
 
 # Copy Launch4j configuration files

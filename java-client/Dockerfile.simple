@@ -1,5 +1,9 @@
 FROM openjdk:8-jdk
 
+# Build argument to bust cache and ensure latest code is used
+ARG BUILD_TIMESTAMP
+ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+
 # Set working directory
 WORKDIR /app
 
@@ -16,8 +20,12 @@ RUN dos2unix ./gradlew
 # Copy build configuration files
 COPY build.gradle .
 COPY settings.gradle .
+COPY gradle.properties .
 
-# Copy source code
+# Use build timestamp to ensure cache is busted for source code
+RUN echo "Building at timestamp: ${BUILD_TIMESTAMP}"
+
+# Copy source code (this layer will always rebuild due to timestamp above)
 COPY src ./src
 
 # Make gradlew executable and verify

@@ -20,14 +20,20 @@ if ($args[0] -eq "--jar-only") {
 
 Write-Host ""
 
+# Generate build timestamp to bust Docker cache and ensure latest code is used
+$BUILD_TIMESTAMP = [int][double]::Parse((Get-Date -UFormat %s))
+Write-Host "Build timestamp: $BUILD_TIMESTAMP (ensures fresh build with latest code)"
+
 # Build the Docker image
 Write-Host "Step 1: Building Docker image..."
 Write-Host "--------"
 if ($args[0] -ne "--jar-only") {
     # Use x86_64 platform for launch4j compatibility
-    docker build --platform linux/amd64 -f $DOCKERFILE -t node-drive-java-builder .
+    # Use --no-cache to ensure latest project files are always used
+    docker build --platform linux/amd64 --no-cache --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP -f $DOCKERFILE -t node-drive-java-builder .
 } else {
-    docker build -f $DOCKERFILE -t node-drive-java-builder .
+    # Use --no-cache to ensure latest project files are always used
+    docker build --no-cache --build-arg BUILD_TIMESTAMP=$BUILD_TIMESTAMP -f $DOCKERFILE -t node-drive-java-builder .
 }
 
 if ($LASTEXITCODE -ne 0) {
