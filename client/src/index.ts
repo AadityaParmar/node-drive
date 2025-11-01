@@ -2,8 +2,8 @@
 import * as fs from "node:fs";
 import {AppLog} from "./appLog.js";
 import {ServerApiClient} from "./ServerApiClient.js";
-import {calculateFileChecksum} from "./simpleTest.js";
 import {getFileInfo} from "./types.js";
+import {calculateFileChecksum} from "./utils/utils.js";
 
 function main()
 {
@@ -26,7 +26,6 @@ function main()
     fileSize: file.fileSize,
     lastModified: file.lastModified,
     checksum: checksum
-
   });
 
 }
