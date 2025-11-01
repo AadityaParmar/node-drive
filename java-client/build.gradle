@@ -299,8 +299,11 @@ else
     exit 1
 fi
 
-# Run the application
-exec "\$JAVA_CMD" -jar "\$JAR_FILE" "\$@"
+# Run the application with system properties from gradle.properties
+exec "\$JAVA_CMD" \\
+    -Dnode.drive.watchPath="${project.findProperty('watchPath') ?: ''}" \\
+    -Dnode.drive.serverUrl="${project.findProperty('serverUrl') ?: ''}" \\
+    -jar "\$JAR_FILE" "\$@"
 """.stripIndent()
 
         // Make it executable
