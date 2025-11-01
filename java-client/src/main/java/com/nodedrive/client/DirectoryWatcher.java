@@ -49,6 +49,7 @@ public class DirectoryWatcher {
     private WatchService watchService;
     private volatile boolean running = false;
     private ExecutorService executor;
+    private final Map<WatchKey, Path> watchKeys = new ConcurrentHashMap<>();
 
     public DirectoryWatcher(String path, FileEventCallback callback) {
         this.watchPath = Paths.get(path);
@@ -74,19 +75,34 @@ public class DirectoryWatcher {
 
         watchService = FileSystems.getDefault().newWatchService();
 
-        // Register directory for all event types
-        watchPath.register(watchService,
-                StandardWatchEventKinds.ENTRY_CREATE,
-                StandardWatchEventKinds.ENTRY_MODIFY,
-                StandardWatchEventKinds.ENTRY_DELETE);
+        // Register directory and all subdirectories recursively
+        registerDirectoryRecursively(watchPath);
 
         running = true;
         executor = Executors.newSingleThreadExecutor();
 
         // Start watching in background thread
         executor.submit(() -> {
-            AppLog.info("DirectoryWatcher", "Started watching: " + watchPath);
+            AppLog.info("DirectoryWatcher", "Started watching: " + watchPath + " (recursive)");
             watchLoop();
+        });
+    }
+
+    /**
+     * Register a directory and all its subdirectories with the watch service
+     */
+    private void registerDirectoryRecursively(Path dir) throws IOException {
+        Files.walkFileTree(dir, new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attrs) throws IOException {
+                WatchKey key = directory.register(watchService,
+                        StandardWatchEventKinds.ENTRY_CREATE,
+                        StandardWatchEventKinds.ENTRY_MODIFY,
+                        StandardWatchEventKinds.ENTRY_DELETE);
+                watchKeys.put(key, directory);
+                AppLog.debug("DirectoryWatcher", "Registered: " + directory);
+                return FileVisitResult.CONTINUE;
+            }
         });
     }
 
@@ -120,6 +136,7 @@ public class DirectoryWatcher {
             }
         }
 
+        watchKeys.clear();
         AppLog.info("DirectoryWatcher", "Stopped watching: " + watchPath);
     }
 
@@ -143,6 +160,14 @@ public class DirectoryWatcher {
                 break;
             }
 
+            // Get the directory for this watch key
+            Path dir = watchKeys.get(key);
+            if (dir == null) {
+                AppLog.warn("DirectoryWatcher", "Watch key not recognized");
+                key.reset();
+                continue;
+            }
+
             for (WatchEvent<?> event : key.pollEvents()) {
                 WatchEvent.Kind<?> kind = event.kind();
 
@@ -154,7 +179,19 @@ public class DirectoryWatcher {
                 @SuppressWarnings("unchecked")
                 WatchEvent<Path> pathEvent = (WatchEvent<Path>) event;
                 Path filename = pathEvent.context();
-                Path fullPath = watchPath.resolve(filename);
+                Path fullPath = dir.resolve(filename);
+
+                // If a new directory is created, register it
+                if (kind == StandardWatchEventKinds.ENTRY_CREATE) {
+                    try {
+                        if (Files.isDirectory(fullPath)) {
+                            registerDirectoryRecursively(fullPath);
+                            AppLog.info("DirectoryWatcher", "Registered new directory: " + fullPath);
+                        }
+                    } catch (IOException e) {
+                        AppLog.error("DirectoryWatcher", "Failed to register new directory: " + e.getMessage());
+                    }
+                }
 
                 handleFileEvent(kind, fullPath);
             }
@@ -162,8 +199,8 @@ public class DirectoryWatcher {
             // Reset the key
             boolean valid = key.reset();
             if (!valid) {
-                AppLog.error("DirectoryWatcher", "Watch key no longer valid");
-                break;
+                watchKeys.remove(key);
+                AppLog.warn("DirectoryWatcher", "Watch key no longer valid, removed from tracking");
             }
         }
     }

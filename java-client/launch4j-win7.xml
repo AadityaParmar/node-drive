@@ -27,7 +27,7 @@
     <maxVersion></maxVersion>
     <jdkPreference>preferJre</jdkPreference>
     <runtimeBits>64</runtimeBits>
-    <opt>-Dnode.drive.watchPath=/Users/aditya/Documents/node-drive/target2</opt>
+    <opt>-Dnode.drive.watchPath=/Users/aditya/Documents/node-drive/target</opt>
     <opt>-Dnode.drive.serverUrl=http://localhost:3000</opt>
   </jre>
 
