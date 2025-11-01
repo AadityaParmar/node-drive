@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- NOTE: This is a static template. For automatic generation from gradle.properties,
+     use: ./gradlew generateLaunch4jConfigs (creates build/launch4j-*.xml)
+     The Gradle build tasks automatically generate and use the dynamic configs. -->
 <launch4jConfig>
   <dontWrapJar>false</dontWrapJar>
   <headerType>console</headerType>
@@ -24,6 +27,8 @@
     <maxVersion></maxVersion>
     <jdkPreference>preferJre</jdkPreference>
     <runtimeBits>64</runtimeBits>
+    <opt>-Dnode.drive.watchPath=/Users/aditya/Documents/node-drive/target2</opt>
+    <opt>-Dnode.drive.serverUrl=http://localhost:3000</opt>
   </jre>
 
   <!-- Version Info -->

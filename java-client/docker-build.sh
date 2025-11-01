@@ -1,9 +1,82 @@
 #!/bin/bash
+# Docker Build Script for Node Drive Java Client
+#
+# This script automatically:
+# 1. Reads configuration from gradle.properties (watchPath, serverUrl)
+# 2. Updates Launch4j XML files with the latest values
+# 3. Builds JAR and executables using Docker
+#
+# Usage:
+#   ./docker-build.sh              # Build JAR + all executables
+#   ./docker-build.sh --jar-only   # Build JAR only (faster)
+#
+# The script ensures that all Windows executables (.exe) are built with
+# the correct configuration from gradle.properties, so you don't need to
+# manually update the XML files.
+
 set -e
 
 echo "========================================================"
 echo "  Node Drive Java Client - Docker Build"
 echo "========================================================"
+
+# Update static XML files with values from gradle.properties
+echo "Step 0: Updating Launch4j XML configurations from gradle.properties..."
+echo "--------"
+
+# Check if gradle.properties exists
+if [ ! -f "gradle.properties" ]; then
+    echo "ERROR: gradle.properties not found!"
+    exit 1
+fi
+
+# Read values from gradle.properties
+WATCH_PATH=$(grep "^watchPath=" gradle.properties | cut -d'=' -f2)
+SERVER_URL=$(grep "^serverUrl=" gradle.properties | cut -d'=' -f2)
+
+# Validate that values were read
+if [ -z "$WATCH_PATH" ]; then
+    echo "ERROR: watchPath not found in gradle.properties!"
+    exit 1
+fi
+
+if [ -z "$SERVER_URL" ]; then
+    echo "ERROR: serverUrl not found in gradle.properties!"
+    exit 1
+fi
+
+echo "  watchPath: $WATCH_PATH"
+echo "  serverUrl: $SERVER_URL"
+
+# Function to update XML file
+update_xml() {
+    local xml_file=$1
+    local watch_path=$2
+    local server_url=$3
+
+    # Check if opt tags already exist
+    if grep -q "<opt>-Dnode.drive.watchPath=" "$xml_file"; then
+        # Update existing opt tags
+        sed -i.bak "s|<opt>-Dnode.drive.watchPath=.*</opt>|<opt>-Dnode.drive.watchPath=${watch_path}</opt>|g" "$xml_file"
+        sed -i.bak "s|<opt>-Dnode.drive.serverUrl=.*</opt>|<opt>-Dnode.drive.serverUrl=${server_url}</opt>|g" "$xml_file"
+    else
+        # Add opt tags before </jre> tag
+        sed -i.bak "s|</jre>|    <opt>-Dnode.drive.watchPath=${watch_path}</opt>\n    <opt>-Dnode.drive.serverUrl=${server_url}</opt>\n  </jre>|g" "$xml_file"
+    fi
+
+    # Remove backup file
+    rm -f "${xml_file}.bak"
+}
+
+# Update all three XML files
+update_xml "launch4j-win10.xml" "$WATCH_PATH" "$SERVER_URL"
+update_xml "launch4j-win7.xml" "$WATCH_PATH" "$SERVER_URL"
+update_xml "launch4j-winxp.xml" "$WATCH_PATH" "$SERVER_URL"
+
+echo "  ✓ Updated launch4j-win10.xml"
+echo "  ✓ Updated launch4j-win7.xml"
+echo "  ✓ Updated launch4j-winxp.xml"
+echo ""
 
 # Determine which Dockerfile to use
 DOCKERFILE="Dockerfile"

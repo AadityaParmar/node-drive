@@ -140,26 +140,38 @@ brew install launch4j
 sudo apt-get install launch4j
 ```
 
-### Method 3: Using Docker (Cross-platform)
+### Method 3: Using Docker (Cross-platform, Recommended)
 
-Create a `Dockerfile`:
+The easiest way to build all executables is using the provided `docker-build.sh` script:
 
-```dockerfile
-FROM openjdk:8-jdk
+```bash
+# Build JAR + all Windows executables + macOS executable
+./docker-build.sh
 
-# Install Launch4j
-RUN apt-get update && apt-get install -y launch4j
-
-WORKDIR /app
-COPY . .[Dockerfile](Dockerfile)
-
-RUN ./gradlew build
-RUN launch4jc launch4j-win10.xml
-
-CMD ["ls", "-lh", "build/executables/"]
+# Or build JAR only (faster)
+./docker-build.sh --jar-only
 ```
 
-Build:
+**What it does:**
+1. Automatically reads `watchPath` and `serverUrl` from `gradle.properties`
+2. Updates Launch4j XML configurations with the latest values
+3. Builds JAR and all executables using Docker
+4. Outputs to `build/libs/` and `build/executables/`
+
+**Configuration:**
+
+Edit `gradle.properties` to customize:
+
+```properties
+watchPath=/path/to/watch
+serverUrl=http://localhost:3000
+```
+
+The script automatically updates all Windows .exe files with these values, so you don't need to manually edit XML files.
+
+**Manual Docker Build:**
+
+If you prefer manual control:
 
 ```bash
 docker build -t node-drive-builder .
