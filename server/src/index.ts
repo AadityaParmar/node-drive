@@ -1,7 +1,6 @@
 import express from 'express';
 import multer from 'multer';
 import cors from 'cors';
-import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
@@ -14,7 +13,7 @@ app.use(cors());
 app.use(express.json());
 
 const UPLOAD_DIR = './uploads';
-const METADATA_DIR = './metadata';
+const METADATA_FILE = './uploads/metadata.json';
 
 interface FileMetadata {
   username: string;
@@ -22,51 +21,58 @@ interface FileMetadata {
   fileName: string;
   fileSize: number;
   checksum: string;
-  uploadId: string;
   uploadedSize: number;
   isComplete: boolean;
   lastModified: string;
   uploadTimestamp: string;
-  finalFileName?: string;
+}
+
+interface MetadataStore {
+  [deviceId: string]: {
+    [checksum: string]: FileMetadata;
+  };
 }
 
 async function ensureDirectories() {
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
-  await fs.mkdir(METADATA_DIR, { recursive: true });
 }
 
-function getFileKey(username: string, deviceId: string, fileName: string): string {
-  return `${username}_${deviceId}_${fileName}`;
+function getUserDeviceDir(username: string, deviceId: string): string {
+  return path.join(UPLOAD_DIR, `${username}-${deviceId}`);
 }
 
-function getMetadataPath(fileKey: string): string {
-  return path.join(METADATA_DIR, `${fileKey}.json`);
+function getUploadPath(username: string, deviceId: string, fileName: string): string {
+  const userDir = getUserDeviceDir(username, deviceId);
+  return path.join(userDir, fileName);
 }
 
-function getUploadPath(uploadId: string): string {
-  return path.join(UPLOAD_DIR, uploadId);
-}
-
-function generateTimestampedFileName(originalFileName: string): string {
-  const timestamp = Date.now();
-  const ext = path.extname(originalFileName);
-  const nameWithoutExt = path.basename(originalFileName, ext);
-  return `${nameWithoutExt}(${timestamp})${ext}`;
-}
-
-async function loadMetadata(fileKey: string): Promise<FileMetadata | null> {
+async function loadAllMetadata(): Promise<MetadataStore> {
   try {
-    const metadataPath = getMetadataPath(fileKey);
-    const data = await fs.readFile(metadataPath, 'utf-8');
+    const data = await fs.readFile(METADATA_FILE, 'utf-8');
     return JSON.parse(data);
   } catch {
-    return null;
+    return {};
   }
 }
 
-async function saveMetadata(fileKey: string, metadata: FileMetadata): Promise<void> {
-  const metadataPath = getMetadataPath(fileKey);
-  await fs.writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+async function saveAllMetadata(metadataStore: MetadataStore): Promise<void> {
+  await fs.writeFile(METADATA_FILE, JSON.stringify(metadataStore, null, 2));
+}
+
+async function loadMetadata(deviceId: string, checksum: string): Promise<FileMetadata | null> {
+  const metadataStore = await loadAllMetadata();
+  return metadataStore[deviceId]?.[checksum] || null;
+}
+
+async function saveMetadata(deviceId: string, checksum: string, metadata: FileMetadata): Promise<void> {
+  const metadataStore = await loadAllMetadata();
+
+  if (!metadataStore[deviceId]) {
+    metadataStore[deviceId] = {};
+  }
+
+  metadataStore[deviceId][checksum] = metadata;
+  await saveAllMetadata(metadataStore);
 }
 
 async function calculateChecksum(filePath: string): Promise<string> {
@@ -87,13 +93,12 @@ app.post('/api/upload/check', async (req, res) => {
   try {
     const { username, deviceId, fileName, fileSize, checksum } = req.body;
     AppLog.debug('UploadCheckEndpoint', `Upload check request for ${fileName} from user ${username}`);
-    
+
     if (!username || !deviceId || !fileName || !fileSize || !checksum) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const fileKey = getFileKey(username, deviceId, fileName);
-    const metadata = await loadMetadata(fileKey);
+    const metadata = await loadMetadata(deviceId, checksum);
 
     if (!metadata) {
       return res.json({
@@ -108,21 +113,20 @@ app.post('/api/upload/check', async (req, res) => {
       return res.status(409).json({
         exists: true,
         uploadedSize: metadata.fileSize,
-        isComplete: true,
-        uploadId: metadata.uploadId
+        isComplete: true
       });
     }
 
     // Handle file size mismatch - restart upload
     if (metadata.fileSize !== fileSize || metadata.checksum !== checksum) {
       AppLog.info('UploadCheckEndpoint', `File metadata mismatch detected, will restart upload: ${fileName} for user ${username}`);
-      const uploadPath = getUploadPath(metadata.uploadId);
+      const uploadPath = getUploadPath(username, deviceId, fileName);
       try {
         await fs.unlink(uploadPath);
       } catch {
         // File might not exist, continue
       }
-      
+
       return res.json({
         exists: false,
         uploadedSize: 0,
@@ -131,14 +135,13 @@ app.post('/api/upload/check', async (req, res) => {
       });
     }
 
-    const uploadPath = getUploadPath(metadata.uploadId);
+    const uploadPath = getUploadPath(username, deviceId, fileName);
     try {
       const stats = await fs.stat(uploadPath);
       return res.json({
         exists: true,
         uploadedSize: stats.size,
-        isComplete: false,
-        uploadId: metadata.uploadId
+        isComplete: false
       });
     } catch {
       return res.json({
@@ -160,33 +163,29 @@ const upload = multer({ storage });
 // File upload endpoint
 app.post('/api/upload', upload.single('file'), async (req, res) => {
   try {
-    const { username, deviceId, fileName, fileSize, checksum, startByte, lastModified, uploadId } = req.body;
+    const { username, deviceId, fileName, fileSize, checksum, startByte, lastModified } = req.body;
     const file = req.file;
 
     if (!username || !deviceId || !fileName || !fileSize || !checksum || !file) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields' 
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
       });
     }
 
     const fileSizeNum = parseInt(fileSize);
     const startByteNum = parseInt(startByte || '0');
     AppLog.info('UploadEndpoint', `Upload request for ${fileName} from user ${username}, startByte: ${startByteNum}`);
-    
-    const fileKey = getFileKey(username, deviceId, fileName);
-    let metadata = await loadMetadata(fileKey);
-    let currentUploadId = uploadId;
+
+    let metadata = await loadMetadata(deviceId, checksum);
 
     if (!metadata) {
-      currentUploadId = uuidv4();
       metadata = {
         username,
         deviceId,
         fileName,
         fileSize: fileSizeNum,
         checksum,
-        uploadId: currentUploadId,
         uploadedSize: 0,
         isComplete: false,
         lastModified,
@@ -194,8 +193,12 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       };
     }
 
-    const uploadPath = getUploadPath(metadata.uploadId);
-    
+    // Ensure user-device directory exists
+    const userDeviceDir = getUserDeviceDir(username, deviceId);
+    await fs.mkdir(userDeviceDir, { recursive: true });
+
+    const uploadPath = getUploadPath(username, deviceId, fileName);
+
     // Handle range validation for resumable uploads
     if (startByteNum > 0) {
       try {
@@ -229,19 +232,13 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 
     const stats = await fs.stat(uploadPath);
     metadata.uploadedSize = stats.size;
-    
+
     // Check if upload is complete
     if (metadata.uploadedSize >= metadata.fileSize) {
       const actualChecksum = await calculateChecksum(uploadPath);
       if (actualChecksum === metadata.checksum) {
-        // Generate timestamped filename and move the file
-        const timestampedFileName = generateTimestampedFileName(fileName);
-        const finalPath = path.join(UPLOAD_DIR, timestampedFileName);
-        
-        await fs.rename(uploadPath, finalPath);
-        metadata.finalFileName = timestampedFileName;
         metadata.isComplete = true;
-        AppLog.info('UploadEndpoint', `File upload completed successfully: ${fileName} -> ${timestampedFileName} for user ${username}`);
+        AppLog.info('UploadEndpoint', `File upload completed successfully: ${fileName} for user ${username}`);
       } else {
         await fs.unlink(uploadPath);
         AppLog.error('UploadEndpoint', `Checksum verification failed for file: ${fileName} for user ${username}`);
@@ -252,20 +249,19 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
       }
     }
 
-    await saveMetadata(fileKey, metadata);
+    await saveMetadata(deviceId, checksum, metadata);
 
     res.json({
       success: true,
-      uploadId: metadata.uploadId,
       bytesUploaded: metadata.uploadedSize,
       isComplete: metadata.isComplete
     });
 
   } catch (error) {
     AppLog.error('UploadEndpoint', `Upload error: ${error}`);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Internal server error' 
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
     });
   }
 });
@@ -273,18 +269,17 @@ app.post('/api/upload', upload.single('file'), async (req, res) => {
 // File delete endpoint
 app.post('/api/delete', async (req, res) => {
   try {
-    const { username, deviceId, fileName } = req.body;
+    const { username, deviceId, fileName, checksum } = req.body;
     AppLog.info('DeleteEndpoint', `Delete request for ${fileName} from user ${username}`);
-    
-    if (!username || !deviceId || !fileName) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Missing required fields' 
+
+    if (!username || !deviceId || !fileName || !checksum) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields'
       });
     }
 
-    const fileKey = getFileKey(username, deviceId, fileName);
-    const metadata = await loadMetadata(fileKey);
+    const metadata = await loadMetadata(deviceId, checksum);
 
     if (!metadata) {
       return res.json({
@@ -293,25 +288,26 @@ app.post('/api/delete', async (req, res) => {
       });
     }
 
-    const uploadPath = getUploadPath(metadata.uploadId);
-    const metadataPath = getMetadataPath(fileKey);
+    const uploadPath = getUploadPath(username, deviceId, fileName);
 
-    // Delete the actual file (either temp upload or final timestamped file)
+    // Delete the actual file
     try {
-      if (metadata.isComplete && metadata.finalFileName) {
-        const finalPath = path.join(UPLOAD_DIR, metadata.finalFileName);
-        await fs.unlink(finalPath);
-      } else {
-        await fs.unlink(uploadPath);
-      }
+      await fs.unlink(uploadPath);
     } catch {
       // File might not exist, continue with metadata cleanup
     }
 
-    try {
-      await fs.unlink(metadataPath);
-    } catch {
-      // Metadata might not exist
+    // Remove from metadata store
+    const metadataStore = await loadAllMetadata();
+    if (metadataStore[deviceId]?.[checksum]) {
+      delete metadataStore[deviceId][checksum];
+
+      // Clean up empty deviceId entries
+      if (Object.keys(metadataStore[deviceId]).length === 0) {
+        delete metadataStore[deviceId];
+      }
+
+      await saveAllMetadata(metadataStore);
     }
 
     res.json({
@@ -321,9 +317,9 @@ app.post('/api/delete', async (req, res) => {
 
   } catch (error) {
     AppLog.error('DeleteEndpoint', `Delete error: ${error}`);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Internal server error' 
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
     });
   }
 });
