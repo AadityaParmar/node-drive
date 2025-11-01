@@ -64,7 +64,7 @@ public class Main {
     public static void main(String[] args) {
         AppLog.info("Main", "===========================================");
         AppLog.info("Main", "Node Drive Client - Java Edition");
-        AppLog.info("Main", "Version: 1.0.0");
+        AppLog.info("Main", "Version: 1.0.1");
         AppLog.info("Main", "Java Version: " + System.getProperty("java.version"));
         AppLog.info("Main", "OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version"));
         AppLog.info("Main", "===========================================");
