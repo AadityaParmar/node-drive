@@ -34,11 +34,16 @@ COPY src ./src
 # Copy Launch4j configuration files
 COPY launch4j-*.xml ./
 
-# Make gradlew executable
-RUN chmod +x ./gradlew
+# Make gradlew executable and verify
+RUN chmod +x ./gradlew && \
+    ls -l ./gradlew && \
+    file ./gradlew && \
+    head -1 ./gradlew
 
-# Build the JAR file
-RUN ./gradlew build
+# Build the JAR file with debugging
+RUN echo "Running Gradle build..." && \
+    ./gradlew --version && \
+    ./gradlew build --info --stacktrace
 
 # Create executables directory
 RUN mkdir -p build/executables

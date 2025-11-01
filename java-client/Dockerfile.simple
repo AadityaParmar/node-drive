@@ -14,11 +14,15 @@ COPY settings.gradle .
 # Copy source code
 COPY src ./src
 
-# Make gradlew executable
-RUN chmod +x ./gradlew
+# Make gradlew executable and verify
+RUN chmod +x ./gradlew && \
+    ls -l ./gradlew && \
+    which sh && \
+    head -1 ./gradlew
 
 # Build the JAR file
-RUN ./gradlew build
+RUN ./gradlew --version && \
+    ./gradlew build --stacktrace
 
 # Default command: list build outputs
 CMD ["sh", "-c", "echo '=== JAR File ===' && ls -lh build/libs/ && echo '\nBuild successful! JAR is ready at: build/libs/java-client-1.0.0.jar'"]
