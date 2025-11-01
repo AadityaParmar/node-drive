@@ -61,7 +61,7 @@ function main()
   // const file = getFileInfo(fileBuffer, "test.txt");
   // AppLog.info("ServerApiClient", "File info: " + JSON.stringify(file));
   // const checksum = calculateFileChecksum("/Users/aditya/Documents/node-drive/target/test.txt");
-  // client.uploadFile({
+  // js-client(depricated).uploadFile({
   //   username: "test",
   //   deviceId: "test",
   //   file: file.file,

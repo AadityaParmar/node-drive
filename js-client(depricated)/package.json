@@ -1,0 +1,37 @@
+{
+  "name": "client",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "dev2": "nodemon --exec tsx src/index.ts",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "build:winxp": "tsc -p tsconfig.winxp.json",
+    "build:win7": "tsc -p tsconfig.win7.json",
+    "build:win10": "tsc -p tsconfig.win10.json",
+    "build:all": "npm run build:winxp && npm run build:win7 && npm run build:win10",
+    "package:winxp": "npm run build:winxp && pkg dist-winxp/index.js --target node6-win-x86 --output ../build/node-drive-client-winxp.exe",
+    "package:win7": "npm run build:win7 && pkg dist-win7/index.js --target node12-win-x64 --output ../build/node-drive-client-win7.exe",
+    "package:win10": "npm run build:win10 && pkg dist-win10/index.js --target node18-win-x64 --output ../build/node-drive-client-win10.exe",
+    "package:all": "npm run package:winxp && npm run package:win7 && npm run package:win10",
+    "clean": "rm -rf dist dist-winxp dist-win7 dist-win10 ../build/*.exe"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.9.1",
+    "jest": "^30.2.0",
+    "ts-jest": "^29.4.5",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "axios": "^1.12.2"
+  }
+}

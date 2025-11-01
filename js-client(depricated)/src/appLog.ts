@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
+import { getDirname } from './buildCompat.js';
 
 export enum LogType {
   DEBUG = 'D',
@@ -20,8 +20,9 @@ export class AppLog {
   };
 
   private constructor() {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    this.logDir = path.join(__dirname, 'logs');
+    // Use compatibility helper that works in both ESM and CommonJS
+    const dirname = getDirname();
+    this.logDir = path.join(dirname, 'logs');
     this.ensureLogDirectory();
   }
 
