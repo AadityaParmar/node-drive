@@ -157,8 +157,80 @@ tasks.build.doLast {
 // Platform-specific executable tasks
 // ====================================
 
+// Task: Generate Launch4j XML with system properties
+task generateLaunch4jConfigs {
+    description = 'Generate Launch4j XML configurations with gradle.properties values'
+    group = 'build'
+
+    doLast {
+        def watchPath = project.findProperty('watchPath') ?: ''
+        def serverUrl = project.findProperty('serverUrl') ?: ''
+
+        def configs = [
+            [name: 'win10', desc: 'Windows 10+', bits: '64', bundled64: 'true'],
+            [name: 'win7', desc: 'Windows 7+', bits: '64', bundled64: 'true'],
+            [name: 'winxp', desc: 'Windows XP', bits: '32', bundled64: 'false']
+        ]
+
+        configs.each { config ->
+            def xmlFile = file("build/launch4j-${config.name}.xml")
+            xmlFile.parentFile.mkdirs()
+
+            xmlFile.text = """<?xml version="1.0" encoding="UTF-8"?>
+<launch4jConfig>
+  <dontWrapJar>false</dontWrapJar>
+  <headerType>console</headerType>
+  <jar>build/libs/java-client-${version}.jar</jar>
+  <outfile>build/executables/node-drive-client-${config.name}.exe</outfile>
+  <errTitle>Node Drive Client</errTitle>
+  <cmdLine></cmdLine>
+  <chdir>.</chdir>
+  <priority>normal</priority>
+  <downloadUrl>http://java.com/download</downloadUrl>
+  <supportUrl>https://github.com/yourusername/node-drive</supportUrl>
+  <stayAlive>false</stayAlive>
+  <restartOnCrash>false</restartOnCrash>
+  <manifest></manifest>
+  <!-- <icon>src/main/resources/app.ico</icon> -->
+
+  <!-- JRE Configuration for ${config.desc} -->
+  <jre>
+    <path>jre</path>
+    <bundledJre64Bit>${config.bundled64}</bundledJre64Bit>
+    <bundledJreAsFallback>false</bundledJreAsFallback>
+    <minVersion>1.8.0</minVersion>
+    <maxVersion></maxVersion>
+    <jdkPreference>preferJre</jdkPreference>
+    <runtimeBits>${config.bits}</runtimeBits>
+    <opt>-Dnode.drive.watchPath=${watchPath}</opt>
+    <opt>-Dnode.drive.serverUrl=${serverUrl}</opt>
+  </jre>
+
+  <!-- Version Info -->
+  <versionInfo>
+    <fileVersion>1.0.0.0</fileVersion>
+    <txtFileVersion>1.0.0</txtFileVersion>
+    <fileDescription>Node Drive Client for ${config.desc}</fileDescription>
+    <copyright>Copyright © 2024 Node Drive</copyright>
+    <productVersion>1.0.0.0</productVersion>
+    <txtProductVersion>1.0.0</txtProductVersion>
+    <productName>Node Drive Client</productName>
+    <companyName>Node Drive</companyName>
+    <internalName>node-drive-client</internalName>
+    <originalFilename>node-drive-client-${config.name}.exe</originalFilename>
+  </versionInfo>
+</launch4jConfig>
+"""
+        }
+
+        println "Generated Launch4j configurations with:"
+        println "  watchPath: ${watchPath}"
+        println "  serverUrl: ${serverUrl}"
+    }
+}
+
 // Task: Build Windows 10 executable
-task buildWin10Exe(type: Exec, dependsOn: 'jar') {
+task buildWin10Exe(type: Exec, dependsOn: ['jar', 'generateLaunch4jConfigs']) {
     description = 'Build Windows 10+ executable using Launch4j'
     group = 'build'
 
@@ -171,11 +243,11 @@ task buildWin10Exe(type: Exec, dependsOn: 'jar') {
     def launch4jCmd = System.getenv('LAUNCH4J_HOME') ?
         "${System.getenv('LAUNCH4J_HOME')}/launch4j" : 'launch4j'
 
-    commandLine 'sh', '-c', "${launch4jCmd} launch4j-win10.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
+    commandLine 'sh', '-c', "${launch4jCmd} build/launch4j-win10.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
 }
 
 // Task: Build Windows 7 executable
-task buildWin7Exe(type: Exec, dependsOn: 'jar') {
+task buildWin7Exe(type: Exec, dependsOn: ['jar', 'generateLaunch4jConfigs']) {
     description = 'Build Windows 7+ executable using Launch4j'
     group = 'build'
 
@@ -187,11 +259,11 @@ task buildWin7Exe(type: Exec, dependsOn: 'jar') {
     def launch4jCmd = System.getenv('LAUNCH4J_HOME') ?
         "${System.getenv('LAUNCH4J_HOME')}/launch4j" : 'launch4j'
 
-    commandLine 'sh', '-c', "${launch4jCmd} launch4j-win7.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
+    commandLine 'sh', '-c', "${launch4jCmd} build/launch4j-win7.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
 }
 
 // Task: Build Windows XP executable
-task buildWinXpExe(type: Exec, dependsOn: 'jar') {
+task buildWinXpExe(type: Exec, dependsOn: ['jar', 'generateLaunch4jConfigs']) {
     description = 'Build Windows XP executable using Launch4j'
     group = 'build'
 
@@ -203,7 +275,7 @@ task buildWinXpExe(type: Exec, dependsOn: 'jar') {
     def launch4jCmd = System.getenv('LAUNCH4J_HOME') ?
         "${System.getenv('LAUNCH4J_HOME')}/launch4j" : 'launch4j'
 
-    commandLine 'sh', '-c', "${launch4jCmd} launch4j-winxp.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
+    commandLine 'sh', '-c', "${launch4jCmd} build/launch4j-winxp.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
 }
 
 // Task: Build all Windows executables
