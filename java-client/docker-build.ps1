@@ -78,9 +78,9 @@ Update-Launch4jXml -xmlFile "launch4j-win10.xml" -watchPath $watchPath -serverUr
 Update-Launch4jXml -xmlFile "launch4j-win7.xml" -watchPath $watchPath -serverUrl $serverUrl
 Update-Launch4jXml -xmlFile "launch4j-winxp.xml" -watchPath $watchPath -serverUrl $serverUrl
 
-Write-Host "  ✓ Updated launch4j-win10.xml" -ForegroundColor Green
-Write-Host "  ✓ Updated launch4j-win7.xml" -ForegroundColor Green
-Write-Host "  ✓ Updated launch4j-winxp.xml" -ForegroundColor Green
+Write-Host "  [OK] Updated launch4j-win10.xml" -ForegroundColor Green
+Write-Host "  [OK] Updated launch4j-win7.xml" -ForegroundColor Green
+Write-Host "  [OK] Updated launch4j-winxp.xml" -ForegroundColor Green
 Write-Host ""
 
 # Determine which Dockerfile to use
@@ -148,22 +148,22 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "========================================================"
-Write-Host "  ✓ Build Complete!" -ForegroundColor Green
+Write-Host "  Build Complete!" -ForegroundColor Green
 Write-Host "========================================================"
 Write-Host ""
 Write-Host "Build Artifacts:"
 Write-Host ""
-Write-Host "  📦 JAR File:"
+Write-Host "  JAR File:"
 Write-Host "     build/libs/java-client-1.0.0.jar"
 Write-Host ""
 
 if ($args[0] -ne "--jar-only") {
-    Write-Host "  💻 Windows Executables:"
+    Write-Host "  Windows Executables:"
     Write-Host "     build/executables/node-drive-client-winxp.exe  (Windows XP - 32-bit)"
     Write-Host "     build/executables/node-drive-client-win7.exe   (Windows 7 - 64-bit)"
     Write-Host "     build/executables/node-drive-client-win10.exe  (Windows 10+ - 64-bit)"
     Write-Host ""
-    Write-Host "  🍎 macOS Executable:"
+    Write-Host "  macOS Executable:"
     Write-Host "     build/executables/node-drive-client-macos      (macOS - Intel & Apple Silicon)"
     Write-Host ""
     Write-Host "  Note: Executables require Java 8+ on target system or bundle JRE"
