@@ -1,5 +1,4 @@
 // Export all public API
-import fs from "fs";
 import * as os from "node:os";
 import {AppLog} from "./appLog.js";
 import {DirectoryWatcher, type FileEvent, FileEventType} from "./DirectoryWatcher.js";
@@ -56,20 +55,6 @@ function main()
   watcher.start();
   const allFiles = watcher.getAllFiles();
   AppLog.info("main", `All files: ${JSON.stringify(allFiles)}`);
-  // AppLog.info("ServerApiClient", "Client initialized");
-  const fileBuffer = fs.readFileSync("/Users/aditya/Documents/node-drive/target/test.txt");
-  // const file = getFileInfo(fileBuffer, "test.txt");
-  // AppLog.info("ServerApiClient", "File info: " + JSON.stringify(file));
-  // const checksum = calculateFileChecksum("/Users/aditya/Documents/node-drive/target/test.txt");
-  // js-client(depricated).uploadFile({
-  //   username: "test",
-  //   deviceId: "test",
-  //   file: file.file,
-  //   fileName: file.fileName,
-  //   fileSize: file.fileSize,
-  //   lastModified: file.lastModified,
-  //   checksum: checksum
-  // });
 
 }
 
