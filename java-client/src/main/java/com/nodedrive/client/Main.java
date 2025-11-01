@@ -28,6 +28,84 @@ public class Main {
     }
 
     /**
+     * Upload a file if it's not already uploaded or has been modified
+     */
+    private static void uploadFileIfNeeded(String filePath, String username, String deviceId, ServerApiClient client) {
+        try {
+            // Read file
+            java.nio.file.Path path = java.nio.file.Paths.get(filePath);
+            if (!java.nio.file.Files.exists(path) || !java.nio.file.Files.isRegularFile(path)) {
+                AppLog.debug("Main", "Skipping non-file: " + filePath);
+                return;
+            }
+
+            byte[] fileBuffer = java.nio.file.Files.readAllBytes(path);
+
+            // Calculate checksum
+            String checksum = calculateChecksum(fileBuffer);
+
+            // Get file info
+            FileInfo.Info fileInfo = FileInfo.getFileInfo(fileBuffer, filePath);
+
+            // Check if file needs to be uploaded
+            ServerApiClient.FileCheckRequest checkRequest = new ServerApiClient.FileCheckRequest();
+            checkRequest.username = username;
+            checkRequest.deviceId = deviceId;
+            checkRequest.fileName = fileInfo.fileName;
+            checkRequest.fileSize = fileInfo.fileSize;
+            checkRequest.checksum = checksum;
+
+            ServerApiClient.FileCheckResponse checkResponse = client.checkFileStatus(checkRequest);
+
+            // Skip if file is already complete on server
+            if (checkResponse.exists && checkResponse.isComplete) {
+                AppLog.info("Main", "File already uploaded: " + fileInfo.fileName);
+                return;
+            }
+
+            // Upload file
+            AppLog.info("Main", "Uploading file: " + fileInfo.fileName);
+            ServerApiClient.FileUploadRequest uploadRequest = new ServerApiClient.FileUploadRequest();
+            uploadRequest.username = username;
+            uploadRequest.deviceId = deviceId;
+            uploadRequest.file = fileInfo.file;
+            uploadRequest.fileName = fileInfo.fileName;
+            uploadRequest.fileSize = fileInfo.fileSize;
+            uploadRequest.lastModified = fileInfo.lastModified;
+            uploadRequest.checksum = checksum;
+
+            client.uploadFile(uploadRequest);
+
+        } catch (Exception e) {
+            AppLog.error("Main", "Failed to upload file " + filePath + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Calculate SHA-256 checksum of file data
+     */
+    private static String calculateChecksum(byte[] data) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(data);
+
+            // Convert to hex string
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            AppLog.error("Main", "SHA-256 algorithm not available: " + e.getMessage());
+            return "";
+        }
+    }
+
+    /**
      * Get MAC address of the first non-loopback network interface
      */
     private static String getMacAddress() {
@@ -108,24 +186,8 @@ public class Main {
             if (event.type == DirectoryWatcher.FileEventType.CREATED ||
                 event.type == DirectoryWatcher.FileEventType.MODIFIED) {
 
-                if (event.fileBuffer != null && event.checksum != null) {
-                    // Get file info
-                    FileInfo.Info fileInfo = FileInfo.getFileInfo(event.fileBuffer, event.filePath);
-                    AppLog.info("Main", "File info: " + fileInfo);
-
-                    // Create upload request
-                    ServerApiClient.FileUploadRequest uploadRequest = new ServerApiClient.FileUploadRequest();
-                    uploadRequest.username = username;
-                    uploadRequest.deviceId = deviceId;
-                    uploadRequest.file = fileInfo.file;
-                    uploadRequest.fileName = fileInfo.fileName;
-                    uploadRequest.fileSize = fileInfo.fileSize;
-                    uploadRequest.lastModified = fileInfo.lastModified;
-                    uploadRequest.checksum = event.checksum;
-
-                    // Upload file to server
-                    client.uploadFile(uploadRequest);
-                }
+                // Upload file if needed (checks before uploading)
+                uploadFileIfNeeded(event.filePath, username, deviceId, client);
             }
         });
 
@@ -133,11 +195,17 @@ public class Main {
         try {
             watcher.start();
 
-            // Get all existing files
+            // Get all existing files and upload them
             List<String> allFiles = watcher.getAllFiles();
             AppLog.info("Main", "Found " + allFiles.size() + " existing files");
-            for (String file : allFiles) {
-                AppLog.debug("Main", "  - " + file);
+
+            if (allFiles.size() > 0) {
+                AppLog.info("Main", "Checking and uploading existing files...");
+                for (String file : allFiles) {
+                    AppLog.debug("Main", "Processing: " + file);
+                    uploadFileIfNeeded(file, username, deviceId, client);
+                }
+                AppLog.info("Main", "Finished processing existing files");
             }
 
             // Keep application running

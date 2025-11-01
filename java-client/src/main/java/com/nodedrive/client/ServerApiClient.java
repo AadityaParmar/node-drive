@@ -51,6 +51,27 @@ public class ServerApiClient {
         }
     }
 
+    public static class FileCheckRequest {
+        public String username;
+        public String deviceId;
+        public String fileName;
+        public long fileSize;
+        public String checksum;
+    }
+
+    public static class FileCheckResponse {
+        public boolean exists;
+        public long uploadedSize;
+        public boolean isComplete;
+        public boolean shouldRestart;
+
+        @Override
+        public String toString() {
+            return String.format("FileCheckResponse{exists=%s, uploadedSize=%d, isComplete=%s, shouldRestart=%s}",
+                    exists, uploadedSize, isComplete, shouldRestart);
+        }
+    }
+
     public ServerApiClient(Config config) {
         this.baseUrl = config.baseUrl;
         this.gson = new Gson();
@@ -63,6 +84,58 @@ public class ServerApiClient {
                 .build();
 
         AppLog.info("ServerApiClient", "Initialized with baseUrl: " + baseUrl);
+    }
+
+    /**
+     * Check if a file needs to be uploaded
+     */
+    public FileCheckResponse checkFileStatus(FileCheckRequest request) {
+        AppLog.debug("ServerApiClient", "Checking file status: " + request.fileName);
+
+        try {
+            // Create JSON request body
+            String jsonBody = gson.toJson(request);
+            RequestBody body = RequestBody.create(
+                    jsonBody,
+                    MediaType.parse("application/json")
+            );
+
+            // Build request
+            Request httpRequest = new Request.Builder()
+                    .url(baseUrl + "/api/upload/check")
+                    .post(body)
+                    .build();
+
+            // Execute request
+            try (Response response = httpClient.newCall(httpRequest).execute()) {
+                if (response.isSuccessful() && response.body() != null) {
+                    String responseBody = response.body().string();
+                    FileCheckResponse checkResponse = gson.fromJson(responseBody, FileCheckResponse.class);
+                    AppLog.debug("ServerApiClient", "File check response: " + checkResponse);
+                    return checkResponse;
+                } else if (response.code() == 409) {
+                    // File already exists and is complete
+                    if (response.body() != null) {
+                        String responseBody = response.body().string();
+                        FileCheckResponse checkResponse = gson.fromJson(responseBody, FileCheckResponse.class);
+                        AppLog.info("ServerApiClient", "File already exists on server: " + request.fileName);
+                        return checkResponse;
+                    }
+                }
+                AppLog.error("ServerApiClient", "File check failed: " + response.code() + " - " + response.message());
+            }
+
+        } catch (IOException e) {
+            AppLog.error("ServerApiClient", "File check error: " + e.getMessage());
+        }
+
+        // Return default response indicating file doesn't exist
+        FileCheckResponse defaultResponse = new FileCheckResponse();
+        defaultResponse.exists = false;
+        defaultResponse.uploadedSize = 0;
+        defaultResponse.isComplete = false;
+        defaultResponse.shouldRestart = false;
+        return defaultResponse;
     }
 
     /**
