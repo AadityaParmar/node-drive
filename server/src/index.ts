@@ -37,8 +37,17 @@ async function ensureDirectories() {
   await fs.mkdir(UPLOAD_DIR, { recursive: true });
 }
 
+function sanitizeForFilesystem(str: string): string {
+  // Replace characters that are invalid in Windows/Unix filenames
+  // Windows: < > : " / \ | ? *
+  // We'll replace them with hyphens
+  return str.replace(/[<>:"/\\|?*]/g, '-');
+}
+
 function getUserDeviceDir(username: string, deviceId: string): string {
-  return path.join(UPLOAD_DIR, `${username}-${deviceId}`);
+  const sanitizedUsername = sanitizeForFilesystem(username);
+  const sanitizedDeviceId = sanitizeForFilesystem(deviceId);
+  return path.join(UPLOAD_DIR, `${sanitizedUsername}-${sanitizedDeviceId}`);
 }
 
 function getUploadPath(username: string, deviceId: string, fileName: string): string {
