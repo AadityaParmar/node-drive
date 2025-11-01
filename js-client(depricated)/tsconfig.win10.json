@@ -1,0 +1,26 @@
+{
+  // TypeScript config for Windows 10+ (Node.js 18+ compatibility)
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist-win10",
+
+    // Modern Windows can use CommonJS for pkg compatibility
+    "module": "commonjs",
+    "target": "es2022",
+    "lib": ["es2022"],
+    "moduleResolution": "node",
+
+    // Enable interop for better module compatibility
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    // Disable ESM-specific features for pkg
+    "verbatimModuleSyntax": false,
+
+    // Other settings
+    "sourceMap": false,
+    "declaration": false,
+    "declarationMap": false
+  }
+}

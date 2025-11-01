@@ -1,0 +1,26 @@
+{
+  // TypeScript config for Windows 7 (Node.js 12.x compatibility)
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist-win7",
+
+    // Windows 7 with Node 12 supports ES2015+
+    "module": "commonjs",
+    "target": "es2018",
+    "lib": ["es2018"],
+    "moduleResolution": "node",
+
+    // Enable interop for better module compatibility
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    // Disable ESM-specific features
+    "verbatimModuleSyntax": false,
+
+    // Other settings
+    "sourceMap": false,
+    "declaration": false,
+    "declarationMap": false
+  }
+}

@@ -1,0 +1,24 @@
+FROM openjdk:8-jdk
+
+# Set working directory
+WORKDIR /app
+
+# Copy Gradle wrapper files first (for better caching)
+COPY gradlew .
+COPY gradle ./gradle
+
+# Copy build configuration files
+COPY build.gradle .
+COPY settings.gradle .
+
+# Copy source code
+COPY src ./src
+
+# Make gradlew executable
+RUN chmod +x ./gradlew
+
+# Build the JAR file
+RUN ./gradlew build
+
+# Default command: list build outputs
+CMD ["sh", "-c", "echo '=== JAR File ===' && ls -lh build/libs/ && echo '\nBuild successful! JAR is ready at: build/libs/java-client-1.0.0.jar'"]

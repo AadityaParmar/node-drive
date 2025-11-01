@@ -1,0 +1,24 @@
+# Build outputs
+build/
+.gradle/
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!BUILD_GUIDE.md
+
+# JRE bundles (too large, add manually if needed)
+jre/
+
+# Test files
+test/
+*.test

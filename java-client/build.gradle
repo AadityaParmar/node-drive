@@ -1,0 +1,603 @@
+plugins {
+    id 'java'
+    id 'application'
+    id 'edu.sc.seis.launch4j' version '3.0.5'
+}
+
+group = 'com.nodedrive'
+version = '1.0.0'
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // HTTP Client - OkHttp for Java 8 compatibility
+    implementation 'com.squareup.okhttp3:okhttp:4.9.3'
+
+    // JSON Processing
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+    implementation 'org.slf4j:slf4j-simple:1.7.36'
+
+    // Testing
+    testImplementation 'junit:junit:4.13.2'
+}
+
+application {
+    mainClass = 'com.nodedrive.client.Main'
+}
+
+// Create fat JAR with all dependencies
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'com.nodedrive.client.Main',
+            'Implementation-Title': 'Node Drive Client',
+            'Implementation-Version': version
+        )
+    }
+
+    // Include all dependencies in the JAR
+    from {
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Launch4j configuration for Windows XP (32-bit, Java 8)
+launch4j {
+    mainClassName = 'com.nodedrive.client.Main'
+    icon = "${projectDir}/src/main/resources/app.ico"
+    outputDir = 'build/launch4j'
+
+    // Default configuration
+    jarTask = tasks.jar
+    dontWrapJar = false
+    headerType = "console"
+
+    // JRE requirements
+    bundledJrePath = "jre"
+    jreMinVersion = "1.8.0"
+
+    // Version info
+    fileDescription = "Node Drive Client"
+    copyright = "Copyright © 2024"
+    productName = "Node Drive Client"
+    companyName = "Node Drive"
+    internalName = "node-drive-client"
+}
+
+// Note: Launch4j tasks are commented out until proper configuration
+// To use Launch4j, you need to configure it manually or use the launch4j CLI tool
+// The JAR file can be wrapped with Launch4j separately
+
+// Task: Show how to create Windows executables manually
+task windowsExeBuildInfo {
+    description = 'Show instructions for creating Windows executables'
+    group = 'build'
+
+    doLast {
+        println """
+        ========================================
+        Creating Windows Executables
+        ========================================
+
+        1. Build the JAR file:
+           ./gradlew jar
+
+        2. Download Launch4j from:
+           http://launch4j.sourceforge.net/
+
+        3. Download Java 8 JRE:
+           - 32-bit (XP): https://adoptium.net/temurin/releases/?version=8&os=windows&arch=x86
+           - 64-bit (7+): https://adoptium.net/temurin/releases/?version=8&os=windows&arch=x64
+
+        4. Extract JRE to 'jre/' folder
+
+        5. Use Launch4j to wrap the JAR:
+           - Input: build/libs/java-client-${version}.jar
+           - Output: node-drive-client.exe
+           - Main class: com.nodedrive.client.Main
+           - Bundled JRE: jre
+           - Min JRE: 1.8.0
+
+        Or use command line Launch4j with XML config files.
+        See launch4j-*.xml files for reference.
+
+        ========================================
+        """.stripIndent()
+    }
+}
+
+// Custom task to show build info
+task buildInfo {
+    doLast {
+        println """
+        ====================================
+        Node Drive Client - Build Info
+        ====================================
+        Version: ${version}
+        Java Version: ${sourceCompatibility}
+        Main Class: ${application.mainClass.get()}
+
+        Available Tasks:
+        - ./gradlew jar                  : Build fat JAR
+        - ./gradlew run                  : Run the application
+        - ./gradlew test                 : Run tests
+        - ./gradlew windowsExeBuildInfo  : Show how to create .exe files
+
+        Output:
+        - JAR: build/libs/java-client-${version}.jar
+
+        Run with custom arguments:
+        - ./gradlew run --args="/path/to/watch http://server:3000"
+        ====================================
+        """.stripIndent()
+    }
+}
+
+// Show build info after successful build
+tasks.build.doLast {
+    tasks.buildInfo.actions.each { it.execute(tasks.buildInfo) }
+}
+
+// ====================================
+// Platform-specific executable tasks
+// ====================================
+
+// Task: Build Windows 10 executable
+task buildWin10Exe(type: Exec, dependsOn: 'jar') {
+    description = 'Build Windows 10+ executable using Launch4j'
+    group = 'build'
+
+    doFirst {
+        mkdir('build/executables')
+        println "Building Windows 10 executable..."
+    }
+
+    // Check if launch4j is available
+    def launch4jCmd = System.getenv('LAUNCH4J_HOME') ?
+        "${System.getenv('LAUNCH4J_HOME')}/launch4j" : 'launch4j'
+
+    commandLine 'sh', '-c', "${launch4jCmd} launch4j-win10.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
+}
+
+// Task: Build Windows 7 executable
+task buildWin7Exe(type: Exec, dependsOn: 'jar') {
+    description = 'Build Windows 7+ executable using Launch4j'
+    group = 'build'
+
+    doFirst {
+        mkdir('build/executables')
+        println "Building Windows 7 executable..."
+    }
+
+    def launch4jCmd = System.getenv('LAUNCH4J_HOME') ?
+        "${System.getenv('LAUNCH4J_HOME')}/launch4j" : 'launch4j'
+
+    commandLine 'sh', '-c', "${launch4jCmd} launch4j-win7.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
+}
+
+// Task: Build Windows XP executable
+task buildWinXpExe(type: Exec, dependsOn: 'jar') {
+    description = 'Build Windows XP executable using Launch4j'
+    group = 'build'
+
+    doFirst {
+        mkdir('build/executables')
+        println "Building Windows XP executable..."
+    }
+
+    def launch4jCmd = System.getenv('LAUNCH4J_HOME') ?
+        "${System.getenv('LAUNCH4J_HOME')}/launch4j" : 'launch4j'
+
+    commandLine 'sh', '-c', "${launch4jCmd} launch4j-winxp.xml || echo 'Note: Install Launch4j and set LAUNCH4J_HOME to build Windows executables'"
+}
+
+// Task: Build all Windows executables
+task buildWindowsExes {
+    description = 'Build all Windows executables (XP, 7, 10)'
+    group = 'build'
+    dependsOn 'buildWinXpExe', 'buildWin7Exe', 'buildWin10Exe'
+
+    doLast {
+        println """
+        ========================================
+        Windows executables built successfully!
+        ========================================
+        Output directory: build/executables/
+        - node-drive-client-winxp.exe
+        - node-drive-client-win7.exe
+        - node-drive-client-win10.exe
+        ========================================
+        """.stripIndent()
+    }
+}
+
+// Task: Build macOS executable (uses bundled JRE if available)
+task buildMacExe(dependsOn: 'jar') {
+    description = 'Build macOS executable (shell script wrapper with bundled JRE support)'
+    group = 'build'
+
+    doLast {
+        def execDir = file('build/executables')
+        execDir.mkdirs()
+
+        def macExe = file('build/executables/node-drive-client-macos')
+        def jarPath = "build/libs/java-client-${version}.jar"
+
+        // Create shell script wrapper with bundled JRE support
+        macExe.text = """#!/bin/bash
+# Node Drive Client for macOS
+# Standalone executable with bundled JRE support
+
+# Get the directory where this script is located
+SCRIPT_DIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" && pwd )"
+
+# Look for bundled JRE first
+JAVA_CMD=""
+
+# Check for bundled JRE in the same directory
+if [ -d "\$SCRIPT_DIR/jre" ]; then
+    if [ -f "\$SCRIPT_DIR/jre/Contents/Home/bin/java" ]; then
+        # macOS JRE structure
+        JAVA_CMD="\$SCRIPT_DIR/jre/Contents/Home/bin/java"
+        echo "Using bundled Java Runtime (macOS)"
+    elif [ -f "\$SCRIPT_DIR/jre/bin/java" ]; then
+        # Generic JRE structure
+        JAVA_CMD="\$SCRIPT_DIR/jre/bin/java"
+        echo "Using bundled Java Runtime"
+    fi
+fi
+
+# Fall back to system Java if no bundled JRE
+if [ -z "\$JAVA_CMD" ]; then
+    if command -v java &> /dev/null; then
+        JAVA_CMD="java"
+        JAVA_VERSION=\$(java -version 2>&1 | awk -F '"' '/version/ {print \$2}')
+        echo "Using system Java version: \$JAVA_VERSION"
+    else
+        echo "=========================================="
+        echo "ERROR: Java is not installed!"
+        echo "=========================================="
+        echo ""
+        echo "This application requires Java to run."
+        echo ""
+        echo "Please either:"
+        echo "  1. Download bundled version with Java included from:"
+        echo "     https://github.com/yourusername/node-drive/releases"
+        echo ""
+        echo "  2. Install Java 8 or later from:"
+        echo "     https://adoptium.net/"
+        echo ""
+        echo "=========================================="
+        exit 1
+    fi
+fi
+
+# Find the JAR file
+JAR_FILE=""
+if [ -f "\$SCRIPT_DIR/java-client-${version}.jar" ]; then
+    JAR_FILE="\$SCRIPT_DIR/java-client-${version}.jar"
+elif [ -f "\$SCRIPT_DIR/../../libs/java-client-${version}.jar" ]; then
+    JAR_FILE="\$SCRIPT_DIR/../../libs/java-client-${version}.jar"
+else
+    echo "Error: JAR file not found"
+    echo "Expected: \$SCRIPT_DIR/java-client-${version}.jar"
+    exit 1
+fi
+
+# Run the application
+exec "\$JAVA_CMD" -jar "\$JAR_FILE" "\$@"
+""".stripIndent()
+
+        // Make it executable
+        macExe.setExecutable(true, false)
+
+        // Copy JAR to executables directory
+        copy {
+            from jarPath
+            into execDir
+        }
+
+        println """
+        ========================================
+        macOS executable created successfully!
+        ========================================
+        Output: build/executables/node-drive-client-macos
+
+        This executable supports bundled JRE!
+        - With bundled JRE: No Java installation required
+        - Without bundled JRE: Uses system Java
+
+        To create standalone bundle:
+          ./gradlew packageMacStandalone
+
+        Usage:
+          ./build/executables/node-drive-client-macos /path/to/watch http://server:3000
+        ========================================
+        """.stripIndent()
+    }
+}
+
+// ====================================
+// Standalone packaging tasks (with bundled JRE)
+// ====================================
+
+// Task: Show JRE download instructions
+task downloadJreInfo {
+    description = 'Show instructions for downloading JRE for bundling'
+    group = 'distribution'
+
+    doLast {
+        println """
+        ========================================
+        JRE Download Instructions
+        ========================================
+
+        To create standalone executables, download the appropriate JRE:
+
+        macOS (64-bit):
+          Download: https://adoptium.net/temurin/releases/?version=8&os=mac&arch=x64
+          Extract to: build/jre/macos/jre/
+
+        Windows 10/7 (64-bit):
+          Download: https://adoptium.net/temurin/releases/?version=8&os=windows&arch=x64
+          Extract to: build/jre/windows-x64/jre/
+
+        Windows XP (32-bit):
+          Download: https://adoptium.net/temurin/releases/?version=8&os=windows&arch=x86
+          Extract to: build/jre/windows-x86/jre/
+
+        Quick setup:
+          1. Download the JRE archives
+          2. Extract each to the appropriate directory
+          3. Run: ./gradlew packageStandalone
+
+        Directory structure should be:
+          build/jre/
+          ├── macos/jre/Contents/Home/bin/java
+          ├── windows-x64/jre/bin/java.exe
+          └── windows-x86/jre/bin/java.exe
+
+        ========================================
+        """.stripIndent()
+    }
+}
+
+// Task: Package macOS standalone (with bundled JRE)
+task packageMacStandalone(dependsOn: 'buildMacExe') {
+    description = 'Package macOS executable with bundled JRE'
+    group = 'distribution'
+
+    doLast {
+        def packageDir = file('build/packages/node-drive-client-macos')
+        def jreSource = file('build/jre/macos/jre')
+        def execSource = file('build/executables/node-drive-client-macos')
+        def jarSource = file("build/executables/java-client-${version}.jar")
+
+        // Clean and create package directory
+        delete packageDir
+        packageDir.mkdirs()
+
+        // Copy executable and JAR
+        copy {
+            from execSource
+            into packageDir
+        }
+        copy {
+            from jarSource
+            into packageDir
+        }
+
+        // Copy JRE if available
+        if (jreSource.exists()) {
+            copy {
+                from jreSource
+                into file("${packageDir}/jre")
+            }
+            println "✓ Bundled JRE included"
+        } else {
+            println "⚠ Warning: JRE not found at ${jreSource}"
+            println "  The executable will require system Java installation"
+            println "  Run: ./gradlew downloadJreInfo for instructions"
+        }
+
+        // Make executable
+        file("${packageDir}/node-drive-client-macos").setExecutable(true, false)
+
+        // Create distribution archive
+        def distFile = file('build/distributions/node-drive-client-macos.tar.gz')
+        distFile.parentFile.mkdirs()
+
+        ant.tar(destfile: distFile, compression: 'gzip') {
+            tarfileset(dir: packageDir.parentFile, includes: 'node-drive-client-macos/**/*', filemode: '755') {
+                include(name: '**/node-drive-client-macos')
+            }
+            tarfileset(dir: packageDir.parentFile, includes: 'node-drive-client-macos/**/*') {
+                exclude(name: '**/node-drive-client-macos')
+            }
+        }
+
+        def packageSize = String.format("%.2f MB", distFile.length() / 1024.0 / 1024.0)
+
+        println """
+        ========================================
+        macOS Standalone Package Created!
+        ========================================
+        Package: ${packageDir.absolutePath}
+        Archive: ${distFile.absolutePath} (${packageSize})
+
+        This is a standalone package ${jreSource.exists() ? 'with bundled JRE' : '(requires Java)'}.
+        Users can run it without installing Java separately.
+
+        Test it:
+          ${packageDir}/node-drive-client-macos /tmp/test http://localhost:3000
+        ========================================
+        """.stripIndent()
+    }
+}
+
+// Task: Package Windows standalone (with bundled JRE)
+task packageWindowsStandalone(dependsOn: 'buildWindowsExes') {
+    description = 'Package Windows executables with bundled JRE'
+    group = 'distribution'
+
+    doLast {
+        def platforms = [
+            [name: 'win10', arch: 'x64', desc: 'Windows 10+'],
+            [name: 'win7', arch: 'x64', desc: 'Windows 7+'],
+            [name: 'winxp', arch: 'x86', desc: 'Windows XP']
+        ]
+
+        platforms.each { platform ->
+            def packageDir = file("build/packages/node-drive-client-${platform.name}")
+            def jreSource = file("build/jre/windows-${platform.arch}/jre")
+            def exeSource = file("build/executables/node-drive-client-${platform.name}.exe")
+
+            // Clean and create package directory
+            delete packageDir
+            packageDir.mkdirs()
+
+            // Copy executable
+            if (exeSource.exists()) {
+                copy {
+                    from exeSource
+                    into packageDir
+                }
+
+                // Copy JRE if available
+                if (jreSource.exists()) {
+                    copy {
+                        from jreSource
+                        into file("${packageDir}/jre")
+                    }
+                    println "✓ ${platform.desc}: Bundled JRE included"
+                } else {
+                    println "⚠ ${platform.desc}: JRE not found at ${jreSource}"
+                    println "  Run: ./gradlew downloadJreInfo"
+                }
+
+                // Create ZIP distribution
+                def distFile = file("build/distributions/node-drive-client-${platform.name}.zip")
+                distFile.parentFile.mkdirs()
+
+                ant.zip(destfile: distFile) {
+                    zipfileset(dir: packageDir.parentFile, includes: "node-drive-client-${platform.name}/**/*")
+                }
+
+                def packageSize = String.format("%.2f MB", distFile.length() / 1024.0 / 1024.0)
+                println "  Archive: ${distFile.name} (${packageSize})"
+            } else {
+                println "⚠ ${platform.desc}: Executable not found, skipping..."
+            }
+        }
+
+        println """
+        ========================================
+        Windows Standalone Packages Created!
+        ========================================
+        Output: build/distributions/
+
+        Packages created for:
+          - Windows XP (32-bit)
+          - Windows 7+ (64-bit)
+          - Windows 10+ (64-bit)
+
+        Each package can run standalone if JRE is bundled.
+        ========================================
+        """.stripIndent()
+    }
+}
+
+// Task: Package all standalone executables
+task packageStandalone {
+    description = 'Package all platform executables with bundled JRE'
+    group = 'distribution'
+    dependsOn 'packageMacStandalone', 'packageWindowsStandalone'
+
+    doLast {
+        def distDir = file('build/distributions')
+
+        println """
+        ========================================
+        ALL STANDALONE PACKAGES CREATED!
+        ========================================
+        Output directory: ${distDir.absolutePath}
+
+        Distribution files:
+        """.stripIndent()
+
+        if (distDir.exists()) {
+            distDir.listFiles().each { file ->
+                def size = String.format("%.2f MB", file.length() / 1024.0 / 1024.0)
+                println "  - ${file.name} (${size})"
+            }
+        }
+
+        println """
+
+        These packages are standalone - users don't need Java installed!
+
+        To distribute:
+          1. Upload files from build/distributions/ to release page
+          2. Users download and extract the appropriate package
+          3. Run the executable directly
+
+        Next steps:
+          - Test executables on target platforms
+          - Create release notes
+          - Upload to GitHub releases or distribution server
+        ========================================
+        """.stripIndent()
+    }
+}
+
+// Task: Export all executables (cross-platform build)
+task exportAll {
+    description = 'Build all executables for all platforms (Windows XP/7/10, macOS)'
+    group = 'distribution'
+    dependsOn 'buildMacExe', 'buildWindowsExes'
+
+    doLast {
+        def execDir = file('build/executables')
+
+        println """
+        ========================================
+        ALL EXECUTABLES BUILT SUCCESSFULLY!
+        ========================================
+        Output directory: ${execDir.absolutePath}
+
+        Files created:
+        """.stripIndent()
+
+        execDir.listFiles().each { file ->
+            def size = String.format("%.2f KB", file.length() / 1024.0)
+            println "  - ${file.name} (${size})"
+        }
+
+        println """
+
+        Platform Support:
+          ✓ macOS     : node-drive-client-macos
+          ✓ Windows XP: node-drive-client-winxp.exe (32-bit)
+          ✓ Windows 7+: node-drive-client-win7.exe (64-bit)
+          ✓ Windows 10: node-drive-client-win10.exe (64-bit)
+
+        Important: These executables require Java to be installed!
+
+        To create STANDALONE packages (no Java required):
+          1. ./gradlew downloadJreInfo  # See JRE download instructions
+          2. Download and extract JREs to build/jre/
+          3. ./gradlew packageStandalone
+
+        ========================================
+        """.stripIndent()
+    }
+}

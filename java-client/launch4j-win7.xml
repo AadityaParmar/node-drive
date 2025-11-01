@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch4jConfig>
+  <dontWrapJar>false</dontWrapJar>
+  <headerType>console</headerType>
+  <jar>build/libs/java-client-1.0.0.jar</jar>
+  <outfile>build/executables/node-drive-client-win7.exe</outfile>
+  <errTitle>Node Drive Client</errTitle>
+  <cmdLine></cmdLine>
+  <chdir>.</chdir>
+  <priority>normal</priority>
+  <downloadUrl>http://java.com/download</downloadUrl>
+  <supportUrl>https://github.com/yourusername/node-drive</supportUrl>
+  <stayAlive>false</stayAlive>
+  <restartOnCrash>false</restartOnCrash>
+  <manifest></manifest>
+  <!-- <icon>src/main/resources/app.ico</icon> -->
+
+  <!-- JRE Configuration for Windows 7+ (64-bit) -->
+  <jre>
+    <path>jre</path>
+    <bundledJre64Bit>true</bundledJre64Bit>
+    <bundledJreAsFallback>false</bundledJreAsFallback>
+    <minVersion>1.8.0</minVersion>
+    <maxVersion></maxVersion>
+    <jdkPreference>preferJre</jdkPreference>
+    <runtimeBits>64</runtimeBits>
+  </jre>
+
+  <!-- Version Info -->
+  <versionInfo>
+    <fileVersion>1.0.0.0</fileVersion>
+    <txtFileVersion>1.0.0</txtFileVersion>
+    <fileDescription>Node Drive Client for Windows 7+</fileDescription>
+    <copyright>Copyright © 2024 Node Drive</copyright>
+    <productVersion>1.0.0.0</productVersion>
+    <txtProductVersion>1.0.0</txtProductVersion>
+    <productName>Node Drive Client</productName>
+    <companyName>Node Drive</companyName>
+    <internalName>node-drive-client</internalName>
+    <originalFilename>node-drive-client-win7.exe</originalFilename>
+  </versionInfo>
+</launch4jConfig>

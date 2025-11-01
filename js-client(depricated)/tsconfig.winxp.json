@@ -1,0 +1,26 @@
+{
+  // TypeScript config for Windows XP (Node.js 6.x compatibility)
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist-winxp",
+
+    // Windows XP requires ES5 and CommonJS
+    "module": "commonjs",
+    "target": "es5",
+    "lib": ["es5", "es2015.promise", "es2015.collection"],
+    "moduleResolution": "node",
+
+    // Enable interop for better module compatibility
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    // Disable features not available in ES5
+    "verbatimModuleSyntax": false,
+
+    // Other settings
+    "sourceMap": false,
+    "declaration": false,
+    "declarationMap": false
+  }
+}
