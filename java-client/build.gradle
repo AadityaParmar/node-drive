@@ -30,6 +30,12 @@ dependencies {
 
 application {
     mainClass = 'com.nodedrive.client.Main'
+
+    // Pass gradle.properties configuration as system properties
+    applicationDefaultJvmArgs = [
+        "-Dnode.drive.watchPath=${project.findProperty('watchPath') ?: ''}",
+        "-Dnode.drive.serverUrl=${project.findProperty('serverUrl') ?: ''}"
+    ]
 }
 
 // Create fat JAR with all dependencies

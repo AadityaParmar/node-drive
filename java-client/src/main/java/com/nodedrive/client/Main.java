@@ -166,33 +166,47 @@ public class Main {
     }
 
     /**
-     * Get watch path from command line arguments or use default
+     * Get watch path from command line arguments, system property, or use default
      */
     private static String getWatchPath(String[] args) {
+        // Priority 1: Command line argument
         if (args.length > 0) {
             return args[0];
         }
 
-        // Default to user's home directory + node-drive/target
+        // Priority 2: System property (from gradle.properties)
+        String propPath = System.getProperty("node.drive.watchPath");
+        if (propPath != null && !propPath.isEmpty()) {
+            return propPath;
+        }
+
+        // Priority 3: Default to user's home directory + node-drive/target
         String userHome = System.getProperty("user.home");
         return userHome + "/Documents/node-drive/target";
     }
 
     /**
-     * Get server URL from command line arguments or environment variable
+     * Get server URL from command line arguments, environment variable, system property, or use default
      */
     private static String getServerUrl(String[] args) {
+        // Priority 1: Command line argument
         if (args.length > 1) {
             return args[1];
         }
 
-        // Check environment variable
+        // Priority 2: Environment variable
         String envUrl = System.getenv("NODE_DRIVE_SERVER_URL");
         if (envUrl != null && !envUrl.isEmpty()) {
             return envUrl;
         }
 
-        // Default
+        // Priority 3: System property (from gradle.properties)
+        String propUrl = System.getProperty("node.drive.serverUrl");
+        if (propUrl != null && !propUrl.isEmpty()) {
+            return propUrl;
+        }
+
+        // Priority 4: Default
         return "http://localhost:3000";
     }
 }
