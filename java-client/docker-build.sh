@@ -33,6 +33,12 @@ fi
 # Read values from gradle.properties
 WATCH_PATH=$(grep "^watchPath=" gradle.properties | cut -d'=' -f2)
 SERVER_URL=$(grep "^serverUrl=" gradle.properties | cut -d'=' -f2)
+HEADLESS_MODE=$(grep "^headlessMode=" gradle.properties | cut -d'=' -f2)
+
+# Default to false if not set
+if [ -z "$HEADLESS_MODE" ]; then
+    HEADLESS_MODE="false"
+fi
 
 # Validate that values were read
 if [ -z "$WATCH_PATH" ]; then
@@ -47,12 +53,26 @@ fi
 
 echo "  watchPath: $WATCH_PATH"
 echo "  serverUrl: $SERVER_URL"
+echo "  headlessMode: $HEADLESS_MODE"
+
+# Determine headerType based on headlessMode
+if [ "$HEADLESS_MODE" = "true" ]; then
+    HEADER_TYPE="gui"
+    echo "  headerType: gui (no terminal window)"
+else
+    HEADER_TYPE="console"
+    echo "  headerType: console (with terminal window)"
+fi
 
 # Function to update XML file
 update_xml() {
     local xml_file=$1
     local watch_path=$2
     local server_url=$3
+    local header_type=$4
+
+    # Update headerType
+    sed -i.bak "s|<headerType>.*</headerType>|<headerType>${header_type}</headerType>|g" "$xml_file"
 
     # Check if opt tags already exist
     if grep -q "<opt>-Dnode.drive.watchPath=" "$xml_file"; then
@@ -69,9 +89,9 @@ update_xml() {
 }
 
 # Update all three XML files
-update_xml "launch4j-win10.xml" "$WATCH_PATH" "$SERVER_URL"
-update_xml "launch4j-win7.xml" "$WATCH_PATH" "$SERVER_URL"
-update_xml "launch4j-winxp.xml" "$WATCH_PATH" "$SERVER_URL"
+update_xml "launch4j-win10.xml" "$WATCH_PATH" "$SERVER_URL" "$HEADER_TYPE"
+update_xml "launch4j-win7.xml" "$WATCH_PATH" "$SERVER_URL" "$HEADER_TYPE"
+update_xml "launch4j-winxp.xml" "$WATCH_PATH" "$SERVER_URL" "$HEADER_TYPE"
 
 echo "  ✓ Updated launch4j-win10.xml"
 echo "  ✓ Updated launch4j-win7.xml"

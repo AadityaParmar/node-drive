@@ -165,6 +165,8 @@ task generateLaunch4jConfigs {
     doLast {
         def watchPath = project.findProperty('watchPath') ?: ''
         def serverUrl = project.findProperty('serverUrl') ?: ''
+        def headlessMode = project.findProperty('headlessMode') ?: 'false'
+        def headerType = (headlessMode == 'true') ? 'gui' : 'console'
 
         def configs = [
             [name: 'win10', desc: 'Windows 10+', bits: '64', bundled64: 'true'],
@@ -179,7 +181,7 @@ task generateLaunch4jConfigs {
             xmlFile.text = """<?xml version="1.0" encoding="UTF-8"?>
 <launch4jConfig>
   <dontWrapJar>false</dontWrapJar>
-  <headerType>console</headerType>
+  <headerType>${headerType}</headerType>
   <jar>build/libs/java-client-${version}.jar</jar>
   <outfile>build/executables/node-drive-client-${config.name}.exe</outfile>
   <errTitle>Node Drive Client</errTitle>
@@ -226,6 +228,7 @@ task generateLaunch4jConfigs {
         println "Generated Launch4j configurations with:"
         println "  watchPath: ${watchPath}"
         println "  serverUrl: ${serverUrl}"
+        println "  headlessMode: ${headlessMode} (headerType: ${headerType})"
     }
 }
 
@@ -309,6 +312,7 @@ task buildMacExe(dependsOn: 'jar') {
 
         def macExe = file('build/executables/node-drive-client-macos')
         def jarPath = "build/libs/java-client-${version}.jar"
+        def headlessMode = project.findProperty('headlessMode') ?: 'false'
 
         // Create shell script wrapper with bundled JRE support
         macExe.text = """#!/bin/bash
@@ -372,10 +376,45 @@ else
 fi
 
 # Run the application with system properties from gradle.properties
-exec "\$JAVA_CMD" \\
-    -Dnode.drive.watchPath="${project.findProperty('watchPath') ?: ''}" \\
-    -Dnode.drive.serverUrl="${project.findProperty('serverUrl') ?: ''}" \\
-    -jar "\$JAR_FILE" "\$@"
+# Check if running in headless mode
+HEADLESS_MODE="${headlessMode}"
+
+if [ "\$HEADLESS_MODE" = "true" ]; then
+    # Run in background without terminal window
+    # Create logs directory
+    LOG_DIR="\$SCRIPT_DIR/logs"
+    mkdir -p "\$LOG_DIR"
+
+    # Generate log filename with timestamp
+    LOG_FILE="\$LOG_DIR/node-drive-client_\$(date +%Y%m%d_%H%M%S).log"
+
+    # Run in background and redirect output to log file
+    nohup "\$JAVA_CMD" \\
+        -Dnode.drive.watchPath="${project.findProperty('watchPath') ?: ''}" \\
+        -Dnode.drive.serverUrl="${project.findProperty('serverUrl') ?: ''}" \\
+        -jar "\$JAR_FILE" "\$@" > "\$LOG_FILE" 2>&1 &
+
+    # Get the process ID
+    PID=\$!
+
+    # Save PID to file
+    echo \$PID > "\$SCRIPT_DIR/node-drive-client.pid"
+
+    echo "Node Drive Client started in background mode"
+    echo "PID: \$PID"
+    echo "Log file: \$LOG_FILE"
+    echo ""
+    echo "To stop the service, run:"
+    echo "  kill \$PID"
+    echo "Or:"
+    echo "  kill \\\$(cat \"\$SCRIPT_DIR/node-drive-client.pid\")"
+else
+    # Run in console mode (with visible terminal)
+    exec "\$JAVA_CMD" \\
+        -Dnode.drive.watchPath="${project.findProperty('watchPath') ?: ''}" \\
+        -Dnode.drive.serverUrl="${project.findProperty('serverUrl') ?: ''}" \\
+        -jar "\$JAR_FILE" "\$@"
+fi
 """.stripIndent()
 
         // Make it executable

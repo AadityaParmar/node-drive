@@ -34,6 +34,12 @@ if (-not (Test-Path "gradle.properties")) {
 $gradleProps = Get-Content "gradle.properties"
 $watchPath = ($gradleProps | Where-Object { $_ -match "^watchPath=" }) -replace "^watchPath=", ""
 $serverUrl = ($gradleProps | Where-Object { $_ -match "^serverUrl=" }) -replace "^serverUrl=", ""
+$headlessMode = ($gradleProps | Where-Object { $_ -match "^headlessMode=" }) -replace "^headlessMode=", ""
+
+# Default to false if not set
+if ([string]::IsNullOrEmpty($headlessMode)) {
+    $headlessMode = "false"
+}
 
 # Validate that values were read
 if ([string]::IsNullOrEmpty($watchPath)) {
@@ -48,16 +54,30 @@ if ([string]::IsNullOrEmpty($serverUrl)) {
 
 Write-Host "  watchPath: $watchPath"
 Write-Host "  serverUrl: $serverUrl"
+Write-Host "  headlessMode: $headlessMode"
+
+# Determine headerType based on headlessMode
+if ($headlessMode -eq "true") {
+    $headerType = "gui"
+    Write-Host "  headerType: gui (no terminal window)" -ForegroundColor Cyan
+} else {
+    $headerType = "console"
+    Write-Host "  headerType: console (with terminal window)" -ForegroundColor Cyan
+}
 
 # Function to update XML file
 function Update-Launch4jXml {
     param(
         [string]$xmlFile,
         [string]$watchPath,
-        [string]$serverUrl
+        [string]$serverUrl,
+        [string]$headerType
     )
 
     $content = Get-Content $xmlFile -Raw
+
+    # Update headerType
+    $content = $content -replace "<headerType>.*?</headerType>", "<headerType>$headerType</headerType>"
 
     # Check if opt tags already exist
     if ($content -match "<opt>-Dnode.drive.watchPath=") {
@@ -74,9 +94,9 @@ function Update-Launch4jXml {
 }
 
 # Update all three XML files
-Update-Launch4jXml -xmlFile "launch4j-win10.xml" -watchPath $watchPath -serverUrl $serverUrl
-Update-Launch4jXml -xmlFile "launch4j-win7.xml" -watchPath $watchPath -serverUrl $serverUrl
-Update-Launch4jXml -xmlFile "launch4j-winxp.xml" -watchPath $watchPath -serverUrl $serverUrl
+Update-Launch4jXml -xmlFile "launch4j-win10.xml" -watchPath $watchPath -serverUrl $serverUrl -headerType $headerType
+Update-Launch4jXml -xmlFile "launch4j-win7.xml" -watchPath $watchPath -serverUrl $serverUrl -headerType $headerType
+Update-Launch4jXml -xmlFile "launch4j-winxp.xml" -watchPath $watchPath -serverUrl $serverUrl -headerType $headerType
 
 Write-Host "  [OK] Updated launch4j-win10.xml" -ForegroundColor Green
 Write-Host "  [OK] Updated launch4j-win7.xml" -ForegroundColor Green
