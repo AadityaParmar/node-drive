@@ -158,6 +158,7 @@ java -jar java-client-1.0.0.jar [WATCH_PATH] [SERVER_URL]
 
 ## Documentation
 
+- **[WINDOWS_BUILD.md](WINDOWS_BUILD.md)** - Quick start guide for Windows users (PowerShell + Docker)
 - **[BUILD_GUIDE.md](BUILD_GUIDE.md)** - Detailed build instructions and troubleshooting
 - **[STANDALONE_BUILD_GUIDE.md](STANDALONE_BUILD_GUIDE.md)** - Create standalone executables with bundled JRE
 - **[EXECUTABLES_GUIDE.md](EXECUTABLES_GUIDE.md)** - Platform-specific executable creation

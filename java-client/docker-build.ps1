@@ -1,10 +1,87 @@
-# PowerShell script for Windows
+# PowerShell script for Windows - Docker Build Script for Node Drive Java Client
+#
+# This script automatically:
+# 1. Reads configuration from gradle.properties (watchPath, serverUrl)
+# 2. Updates Launch4j XML files with the latest values
+# 3. Builds JAR and executables using Docker
+#
+# Usage:
+#   .\docker-build.ps1              # Build JAR + all executables
+#   .\docker-build.ps1 --jar-only   # Build JAR only (faster)
+#
+# The script ensures that all Windows executables (.exe) are built with
+# the correct configuration from gradle.properties, so you don't need to
+# manually update the XML files.
+
 # Stop on errors
 $ErrorActionPreference = "Stop"
 
 Write-Host "========================================================"
 Write-Host "  Node Drive Java Client - Docker Build"
 Write-Host "========================================================"
+
+# Update static XML files with values from gradle.properties
+Write-Host "Step 0: Updating Launch4j XML configurations from gradle.properties..."
+Write-Host "--------"
+
+# Check if gradle.properties exists
+if (-not (Test-Path "gradle.properties")) {
+    Write-Host "ERROR: gradle.properties not found!" -ForegroundColor Red
+    exit 1
+}
+
+# Read values from gradle.properties
+$gradleProps = Get-Content "gradle.properties"
+$watchPath = ($gradleProps | Where-Object { $_ -match "^watchPath=" }) -replace "^watchPath=", ""
+$serverUrl = ($gradleProps | Where-Object { $_ -match "^serverUrl=" }) -replace "^serverUrl=", ""
+
+# Validate that values were read
+if ([string]::IsNullOrEmpty($watchPath)) {
+    Write-Host "ERROR: watchPath not found in gradle.properties!" -ForegroundColor Red
+    exit 1
+}
+
+if ([string]::IsNullOrEmpty($serverUrl)) {
+    Write-Host "ERROR: serverUrl not found in gradle.properties!" -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "  watchPath: $watchPath"
+Write-Host "  serverUrl: $serverUrl"
+
+# Function to update XML file
+function Update-Launch4jXml {
+    param(
+        [string]$xmlFile,
+        [string]$watchPath,
+        [string]$serverUrl
+    )
+
+    $content = Get-Content $xmlFile -Raw
+
+    # Check if opt tags already exist
+    if ($content -match "<opt>-Dnode.drive.watchPath=") {
+        # Update existing opt tags
+        $content = $content -replace "<opt>-Dnode\.drive\.watchPath=.*?</opt>", "<opt>-Dnode.drive.watchPath=$watchPath</opt>"
+        $content = $content -replace "<opt>-Dnode\.drive\.serverUrl=.*?</opt>", "<opt>-Dnode.drive.serverUrl=$serverUrl</opt>"
+    } else {
+        # Add opt tags before </jre> tag
+        $optTags = "    <opt>-Dnode.drive.watchPath=$watchPath</opt>`n    <opt>-Dnode.drive.serverUrl=$serverUrl</opt>`n  </jre>"
+        $content = $content -replace "</jre>", $optTags
+    }
+
+    Set-Content -Path $xmlFile -Value $content -NoNewline
+}
+
+# Update all three XML files
+Update-Launch4jXml -xmlFile "launch4j-win10.xml" -watchPath $watchPath -serverUrl $serverUrl
+Update-Launch4jXml -xmlFile "launch4j-win7.xml" -watchPath $watchPath -serverUrl $serverUrl
+Update-Launch4jXml -xmlFile "launch4j-winxp.xml" -watchPath $watchPath -serverUrl $serverUrl
+
+Write-Host "  ✓ Updated launch4j-win10.xml" -ForegroundColor Green
+Write-Host "  ✓ Updated launch4j-win7.xml" -ForegroundColor Green
+Write-Host "  ✓ Updated launch4j-winxp.xml" -ForegroundColor Green
+Write-Host ""
 
 # Determine which Dockerfile to use
 $DOCKERFILE = "Dockerfile"
