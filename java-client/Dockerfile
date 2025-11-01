@@ -7,6 +7,7 @@ RUN apt-get update && \
     wget \
     unzip \
     file \
+    dos2unix \
     && rm -rf /var/lib/apt/lists/*
 
 # Download and install Launch4j manually
@@ -23,6 +24,9 @@ WORKDIR /app
 # Copy Gradle wrapper files first (for better caching)
 COPY gradlew .
 COPY gradle ./gradle
+
+# Fix line endings for gradlew (in case it was edited on Windows)
+RUN dos2unix ./gradlew
 
 # Copy build configuration files
 COPY build.gradle .

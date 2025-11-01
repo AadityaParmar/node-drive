@@ -3,9 +3,15 @@ FROM openjdk:8-jdk
 # Set working directory
 WORKDIR /app
 
+# Install dos2unix for line ending conversion
+RUN apt-get update && apt-get install -y dos2unix && rm -rf /var/lib/apt/lists/*
+
 # Copy Gradle wrapper files first (for better caching)
 COPY gradlew .
 COPY gradle ./gradle
+
+# Fix line endings for gradlew (in case it was edited on Windows)
+RUN dos2unix ./gradlew
 
 # Copy build configuration files
 COPY build.gradle .
